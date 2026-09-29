@@ -1,4 +1,4 @@
-# CET6 Review v2.1 · Supabase 配置
+# CET6 Review v2.1.2 · Supabase 配置
 
 这版不需要 Google / Firebase。云同步使用 **Supabase Auth + Postgres + Row Level Security (RLS)**，本地 IndexedDB 仍然是离线主数据层。
 

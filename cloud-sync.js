@@ -46,9 +46,12 @@ const state = {
   user: null,
   client: null,
   syncing: false,
+  syncPromise: null,
+  initialSyncDone: false,
   online: navigator.onLine,
   lastSyncAt: localStorage.getItem(LAST_SYNC_STORAGE_KEY) || null,
   lastError: null,
+  rollbackPreventionCount: 0,
   autoTimer: null,
   authSubscription: null
 };
@@ -119,9 +122,12 @@ function getStatus() {
     email: state.user?.email || "",
     uid: state.user?.id || "",
     syncing: state.syncing,
+    initialSyncDone: state.initialSyncDone,
     online: state.online,
     lastSyncAt: state.lastSyncAt,
-    lastError: state.lastError
+    lastError: state.lastError,
+    rollbackPreventionCount: state.rollbackPreventionCount,
+    rollbackProtection: true
   };
 }
 
@@ -148,6 +154,231 @@ function localIsNewer(localRecord, remoteRecord) {
   if (!remoteTime) return true;
   if (!localTime) return false;
   return localTime > remoteTime;
+}
+
+function numericValue(record, key) {
+  const value = Number(record?.[key]);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function compareTextTimestamp(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  if (left === right) return 0;
+  return left > right ? 1 : -1;
+}
+
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+
+  const keys = Object.keys(value).sort();
+  return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+}
+
+function comparableRecord(storeName, record) {
+  if (!record) return null;
+  return sanitizeForCloud(storeName, record);
+}
+
+function recordsEquivalent(storeName, a, b) {
+  return stableStringify(comparableRecord(storeName, a)) ===
+    stableStringify(comparableRecord(storeName, b));
+}
+
+function wordProgressScore(record) {
+  return [
+    numericValue(record, "reviewCount"),
+    numericValue(record, "knowCount") + numericValue(record, "forgotCount"),
+    numericValue(record, "reinforcementCount"),
+    numericValue(record, "correctionCount") + numericValue(record, "reinforcementCorrectionCount")
+  ];
+}
+
+function compareScoreArrays(a, b) {
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i++) {
+    const left = Number(a[i] || 0);
+    const right = Number(b[i] || 0);
+    if (left !== right) return left > right ? 1 : -1;
+  }
+  return 0;
+}
+
+function mergeWordProgressRecords(localRecord, remoteRecord) {
+  if (!localRecord) return remoteRecord ? sanitizeForCloud("wordProgress", remoteRecord) : null;
+  if (!remoteRecord) return sanitizeForCloud("wordProgress", localRecord);
+
+  const localScore = wordProgressScore(localRecord);
+  const remoteScore = wordProgressScore(remoteRecord);
+  let cmp = compareScoreArrays(localScore, remoteScore);
+
+  if (cmp === 0) {
+    cmp = compareTextTimestamp(normalizeTimestamp(localRecord), normalizeTimestamp(remoteRecord));
+  }
+
+  const winner = cmp >= 0 ? localRecord : remoteRecord;
+  const loser = cmp >= 0 ? remoteRecord : localRecord;
+  const merged = {
+    ...sanitizeForCloud("wordProgress", loser),
+    ...sanitizeForCloud("wordProgress", winner)
+  };
+
+  const monotonicFields = [
+    "reviewCount",
+    "knowCount",
+    "forgotCount",
+    "reinforcementCount",
+    "correctionCount",
+    "reinforcementCorrectionCount"
+  ];
+
+  for (const field of monotonicFields) {
+    merged[field] = Math.max(
+      numericValue(localRecord, field),
+      numericValue(remoteRecord, field)
+    );
+  }
+
+  // 若两台设备在相同 reviewCount 上产生不同“认识/忘了”分支，
+  // 合并后的累计次数也不能倒退；必要时把 reviewCount 提升到累计判断总数。
+  merged.reviewCount = Math.max(
+    numericValue(merged, "reviewCount"),
+    numericValue(merged, "knowCount") + numericValue(merged, "forgotCount")
+  );
+
+  // 关键状态由“学习进度更高”的记录决定，而不是由更新时间较新的低进度记录决定。
+  merged.streak = numericValue(winner, "streak");
+  merged.lastRating = winner.lastRating ?? null;
+  merged.lastReviewedAt = winner.lastReviewedAt ?? null;
+  merged.nextReviewDate = winner.nextReviewDate ?? null;
+  merged.lastReinforcementRating = winner.lastReinforcementRating ?? null;
+  merged.lastReinforcementAt = winner.lastReinforcementAt ?? null;
+  merged.lastCorrectionAt = winner.lastCorrectionAt ?? null;
+  merged.updatedAt = winner.updatedAt || normalizeTimestamp(winner) || merged.updatedAt || "";
+  merged.id = winner.id || loser.id;
+  merged.term = winner.term || loser.term || "";
+  merged.sourceOrder = winner.sourceOrder || loser.sourceOrder || 0;
+
+  return merged;
+}
+
+function sessionPrimaryDone(record) {
+  if (!record) return 0;
+
+  const explicit = numericValue(record, "primaryCompleted");
+  const counters = numericValue(record, "know") + numericValue(record, "forgot");
+  const ratings = record.primaryRatings && typeof record.primaryRatings === "object"
+    ? Object.keys(record.primaryRatings).length
+    : 0;
+
+  return Math.max(explicit, counters, ratings);
+}
+
+function dailySessionScore(record) {
+  return [
+    sessionPrimaryDone(record),
+    numericValue(record, "cursor"),
+    numericValue(record, "reinforcementAttempts"),
+    record?.completedAt ? 1 : 0
+  ];
+}
+
+function mergeDailySessionRecords(localRecord, remoteRecord) {
+  if (!localRecord) return remoteRecord ? sanitizeForCloud("dailySessions", remoteRecord) : null;
+  if (!remoteRecord) return sanitizeForCloud("dailySessions", localRecord);
+
+  const localScore = dailySessionScore(localRecord);
+  const remoteScore = dailySessionScore(remoteRecord);
+  let cmp = compareScoreArrays(localScore, remoteScore);
+
+  if (cmp === 0) {
+    cmp = compareTextTimestamp(normalizeTimestamp(localRecord), normalizeTimestamp(remoteRecord));
+  }
+
+  const winner = cmp >= 0 ? localRecord : remoteRecord;
+  const loser = cmp >= 0 ? remoteRecord : localRecord;
+  const merged = {
+    ...sanitizeForCloud("dailySessions", loser),
+    ...sanitizeForCloud("dailySessions", winner)
+  };
+
+  // 会话的队列、游标和评分必须来自同一条更高进度记录，避免“0进度新时间戳”
+  // 覆盖已经完成的学习，也避免把不同队列的游标硬拼到一起。
+  merged.primaryCompleted = sessionPrimaryDone(winner);
+  merged.cursor = numericValue(winner, "cursor");
+  merged.know = numericValue(winner, "know");
+  merged.forgot = numericValue(winner, "forgot");
+  merged.reinforcementAttempts = numericValue(winner, "reinforcementAttempts");
+  merged.queue = Array.isArray(winner.queue) ? winner.queue : [];
+  merged.initialPrimaryCount = numericValue(winner, "initialPrimaryCount");
+  merged.primaryRatings = winner.primaryRatings && typeof winner.primaryRatings === "object"
+    ? { ...winner.primaryRatings }
+    : {};
+  merged.reinsertedIds = Array.isArray(winner.reinsertedIds) ? [...winner.reinsertedIds] : [];
+  merged.planMeta = winner.planMeta && typeof winner.planMeta === "object"
+    ? { ...winner.planMeta }
+    : {};
+  merged.completedAt = winner.completedAt || null;
+  merged.updatedAt = winner.updatedAt || normalizeTimestamp(winner) || merged.updatedAt || "";
+  merged.createdAt = winner.createdAt || loser.createdAt || "";
+  merged.date = winner.date || loser.date;
+
+  return merged;
+}
+
+function resolveStoreRecord(storeName, localRecord, remoteRecord) {
+  if (storeName === "wordProgress") {
+    return mergeWordProgressRecords(localRecord, remoteRecord);
+  }
+
+  if (storeName === "dailySessions") {
+    return mergeDailySessionRecords(localRecord, remoteRecord);
+  }
+
+  // 阅读生词仍按最后更新时间处理，因为它是可编辑文本，不是单调递增的学习进度。
+  if (!localRecord) return remoteRecord ? sanitizeForCloud(storeName, remoteRecord) : null;
+  if (!remoteRecord) return sanitizeForCloud(storeName, localRecord);
+  return localIsNewer(localRecord, remoteRecord)
+    ? sanitizeForCloud(storeName, localRecord)
+    : sanitizeForCloud(storeName, remoteRecord);
+}
+
+function detectRollbackPrevented(storeName, localRecord, remoteRecord, mergedRecord) {
+  if (!localRecord || !remoteRecord || !mergedRecord) return false;
+
+  if (storeName === "dailySessions") {
+    const newerByTime = compareTextTimestamp(
+      normalizeTimestamp(localRecord),
+      normalizeTimestamp(remoteRecord)
+    );
+    const progressCmp = compareScoreArrays(
+      dailySessionScore(localRecord),
+      dailySessionScore(remoteRecord)
+    );
+
+    return newerByTime !== 0 && progressCmp !== 0 && Math.sign(newerByTime) !== Math.sign(progressCmp);
+  }
+
+  if (storeName === "wordProgress") {
+    const newerByTime = compareTextTimestamp(
+      normalizeTimestamp(localRecord),
+      normalizeTimestamp(remoteRecord)
+    );
+    const progressCmp = compareScoreArrays(
+      wordProgressScore(localRecord),
+      wordProgressScore(remoteRecord)
+    );
+
+    return newerByTime !== 0 && progressCmp !== 0 && Math.sign(newerByTime) !== Math.sign(progressCmp);
+  }
+
+  return false;
 }
 
 function readingDocId(normalizedTerm) {
@@ -260,6 +491,25 @@ async function getLocalSnapshot() {
   return { wordProgress, dailySessions, readingWords };
 }
 
+async function getLatestLocalRecord(storeName, record) {
+  if (!record) return null;
+
+  if (storeName === "wordProgress") {
+    return window.getWordProgress?.(record.id) || record;
+  }
+
+  if (storeName === "dailySessions") {
+    return window.getDailySession?.(record.date) || record;
+  }
+
+  if (storeName === "readingWords") {
+    const normalized = String(record.normalizedTerm || record.term || "").trim().toLowerCase();
+    return window.findReadingWordByNormalizedTerm?.(normalized) || record;
+  }
+
+  return record;
+}
+
 async function getRemoteSnapshot(storeName) {
   requireSignedIn();
 
@@ -307,29 +557,57 @@ async function pushRecord(storeName, record, { checkRemote = true } = {}) {
 
   const key = remoteDocId(storeName, record);
 
-  if (checkRemote) {
-    const remote = await getOneRemoteRecord(storeName, key);
-
-    if (remote) {
-      if (storeName === "readingWords" && remote.deleted) {
-        if (!localIsNewer(record, remote)) {
-          await window.deleteReadingWordFromCloud(
-            String(remote.normalizedTerm || decodeReadingDocId(key) || "").toLowerCase()
-          );
-          emitDataUpdated();
-          return { uploaded: 0, downloaded: 1 };
-        }
-      } else if (normalizeTimestamp(remote) > normalizeTimestamp(record)) {
-        await window.upsertRecordFromCloud(storeName, remote);
-        emitDataUpdated();
-        return { uploaded: 0, downloaded: 1 };
-      }
-    }
+  if (!checkRemote) {
+    await upsertRows([buildRow(storeName, record)]);
+    return { uploaded: 1, downloaded: 0 };
   }
 
-  await upsertRows([buildRow(storeName, record)]);
-  return { uploaded: 1, downloaded: 0 };
+  const remote = await getOneRemoteRecord(storeName, key);
+
+  if (storeName === "readingWords" && remote?.deleted) {
+    if (!localIsNewer(record, remote)) {
+      await window.deleteReadingWordFromCloud(
+        String(remote.normalizedTerm || decodeReadingDocId(key) || "").toLowerCase()
+      );
+      emitDataUpdated();
+      return { uploaded: 0, downloaded: 1 };
+    }
+
+    await upsertRows([buildRow(storeName, record)]);
+    return { uploaded: 1, downloaded: 0 };
+  }
+
+  if (!remote) {
+    await upsertRows([buildRow(storeName, record)]);
+    return { uploaded: 1, downloaded: 0 };
+  }
+
+  const merged = resolveStoreRecord(storeName, record, remote);
+
+  if (detectRollbackPrevented(storeName, record, remote, merged)) {
+    state.rollbackPreventionCount++;
+  }
+
+  const localMatches = recordsEquivalent(storeName, record, merged);
+  const remoteMatches = recordsEquivalent(storeName, remote, merged);
+
+  let uploaded = 0;
+  let downloaded = 0;
+
+  if (!localMatches) {
+    await window.upsertRecordFromCloud(storeName, merged);
+    downloaded++;
+    emitDataUpdated();
+  }
+
+  if (!remoteMatches) {
+    await upsertRows([buildRow(storeName, merged)]);
+    uploaded++;
+  }
+
+  return { uploaded, downloaded };
 }
+
 
 async function pushReadingDeletion(normalizedTerm) {
   if (!state.signedIn) return;
@@ -408,11 +686,22 @@ async function mergeStore(storeName, localItems, remoteItems) {
       continue;
     }
 
-    if (localIsNewer(local, remote)) {
-      rowsToUpload.push(buildRow(storeName, local));
-    } else if (normalizeTimestamp(remote) > normalizeTimestamp(local)) {
-      await window.upsertRecordFromCloud(storeName, remote);
+    const merged = resolveStoreRecord(storeName, local, remote);
+
+    if (detectRollbackPrevented(storeName, local, remote, merged)) {
+      state.rollbackPreventionCount++;
+    }
+
+    const localMatches = recordsEquivalent(storeName, local, merged);
+    const remoteMatches = recordsEquivalent(storeName, remote, merged);
+
+    if (!localMatches) {
+      await window.upsertRecordFromCloud(storeName, merged);
       downloaded++;
+    }
+
+    if (!remoteMatches) {
+      rowsToUpload.push(buildRow(storeName, merged));
     }
   }
 
@@ -424,45 +713,58 @@ async function syncNow({ reason = "manual" } = {}) {
   if (!state.configured) throw new Error("Supabase 尚未配置");
   if (!state.signedIn) throw new Error("请先登录 Supabase 账号");
   if (!state.online) throw new Error("当前处于离线状态，本地复习仍可继续");
-  if (state.syncing) return null;
+
+  // v2.1.2：多个登录/聚焦/定时事件同时触发时，全部等待同一个同步 Promise，
+  // 不再让后来的调用直接拿到 null。
+  if (state.syncPromise) {
+    return state.syncPromise;
+  }
 
   state.syncing = true;
   state.lastError = null;
   emitStatus();
 
-  try {
-    await waitForLocalDB();
-    const local = await getLocalSnapshot();
+  state.syncPromise = (async () => {
+    try {
+      await waitForLocalDB();
+      const local = await getLocalSnapshot();
 
-    const [remoteWords, remoteSessions, remoteReading] = await Promise.all([
-      getRemoteSnapshot("wordProgress"),
-      getRemoteSnapshot("dailySessions"),
-      getRemoteSnapshot("readingWords")
-    ]);
+      const [remoteWords, remoteSessions, remoteReading] = await Promise.all([
+        getRemoteSnapshot("wordProgress"),
+        getRemoteSnapshot("dailySessions"),
+        getRemoteSnapshot("readingWords")
+      ]);
 
-    const wordResult = await mergeStore("wordProgress", local.wordProgress, remoteWords);
-    const sessionResult = await mergeStore("dailySessions", local.dailySessions, remoteSessions);
-    const readingResult = await mergeStore("readingWords", local.readingWords, remoteReading);
+      const wordResult = await mergeStore("wordProgress", local.wordProgress, remoteWords);
+      const sessionResult = await mergeStore("dailySessions", local.dailySessions, remoteSessions);
+      const readingResult = await mergeStore("readingWords", local.readingWords, remoteReading);
 
-    state.lastSyncAt = new Date().toISOString();
-    localStorage.setItem(LAST_SYNC_STORAGE_KEY, state.lastSyncAt);
-    state.lastError = null;
-    emitDataUpdated();
+      state.lastSyncAt = new Date().toISOString();
+      state.initialSyncDone = true;
+      localStorage.setItem(LAST_SYNC_STORAGE_KEY, state.lastSyncAt);
+      state.lastError = null;
+      emitDataUpdated();
 
-    return {
-      reason,
-      uploaded: wordResult.uploaded + sessionResult.uploaded + readingResult.uploaded,
-      downloaded: wordResult.downloaded + sessionResult.downloaded + readingResult.downloaded
-    };
-  } catch (error) {
-    state.lastError = error?.message || String(error);
-    console.error("Supabase 同步失败：", error);
-    throw error;
-  } finally {
-    state.syncing = false;
-    emitStatus();
-  }
+      return {
+        reason,
+        uploaded: wordResult.uploaded + sessionResult.uploaded + readingResult.uploaded,
+        downloaded: wordResult.downloaded + sessionResult.downloaded + readingResult.downloaded,
+        rollbackPreventionCount: state.rollbackPreventionCount
+      };
+    } catch (error) {
+      state.lastError = error?.message || String(error);
+      console.error("Supabase 同步失败：", error);
+      throw error;
+    } finally {
+      state.syncing = false;
+      state.syncPromise = null;
+      emitStatus();
+    }
+  })();
+
+  return state.syncPromise;
 }
+
 
 async function createAccount(email, password) {
   if (!state.client) throw new Error("Supabase 尚未初始化");
@@ -504,13 +806,22 @@ async function handleLocalChange(event) {
   const detail = event.detail || {};
 
   try {
+    // 首次登录同步未完成时，不直接把刚创建的本地空会话推上云端。
+    // 先完成一次双向合并，再读取“合并后的最新本地记录”上传。
+    if (!state.initialSyncDone) {
+      await syncNow({ reason: "before-local-push" });
+    }
+
     if (detail.operation === "delete-reading") {
       await pushReadingDeletion(detail.normalizedTerm);
       return;
     }
 
     if (detail.storeName && detail.record) {
-      await pushRecord(detail.storeName, detail.record, { checkRemote: true });
+      const latest = await getLatestLocalRecord(detail.storeName, detail.record);
+      if (latest) {
+        await pushRecord(detail.storeName, latest, { checkRemote: true });
+      }
     }
   } catch (error) {
     // IndexedDB 已先保存成功；云端失败不会影响本地学习。
@@ -518,6 +829,15 @@ async function handleLocalChange(event) {
     state.lastError = error?.message || String(error);
     emitStatus();
   }
+}
+
+async function ensureInitialSync() {
+  if (!state.signedIn || !state.online || state.initialSyncDone) {
+    return true;
+  }
+
+  await syncNow({ reason: "initial-guard" });
+  return state.initialSyncDone;
 }
 
 function startAutoSync() {
@@ -575,7 +895,17 @@ async function initCloud() {
     );
 
     const { data: subscriptionData } = state.client.auth.onAuthStateChange((event, session) => {
-      state.user = session?.user || null;
+      const previousUserId = state.user?.id || "";
+      const nextUser = session?.user || null;
+      const nextUserId = nextUser?.id || "";
+
+      // 切换账号/重新登录时必须重新做一次完整双向合并。
+      // 退出账号不会清本机 IndexedDB。
+      if (previousUserId !== nextUserId) {
+        state.initialSyncDone = false;
+      }
+
+      state.user = nextUser;
       state.signedIn = Boolean(state.user);
       state.ready = true;
       state.lastError = null;
@@ -590,6 +920,7 @@ async function initCloud() {
           });
         }, 0);
       } else {
+        state.initialSyncDone = false;
         stopAutoSync();
       }
 
@@ -657,7 +988,8 @@ window.CET6Cloud = {
   createAccount,
   login,
   logout,
-  syncNow
+  syncNow,
+  ensureInitialSync
 };
 
 initCloud();

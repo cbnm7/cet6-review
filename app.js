@@ -1,11 +1,11 @@
 // =======================================
 // CET6 Review - app.js
-// v2.1 Supabase 多设备同步版
+// v2.1.2 Supabase 多设备同步版
 // 每日队列 + IndexedDB + 二档复习 + 阅读生词
 // + 今日复习总览（三分类） + 重点易错 + 每日复习记录
 // =======================================
 
-const APP_VERSION = "2.1.1 Supabase Sync Fix";
+const APP_VERSION = "2.1.2 Anti-Rollback Sync";
 
 const app = document.querySelector(".app");
 const homePageHTML = app.innerHTML;
@@ -140,12 +140,29 @@ async function createTodaySession() {
   return session;
 }
 
+async function prepareCloudBeforeStudy() {
+  const cloud = window.CET6Cloud;
+  const status = cloud?.getStatus?.();
+
+  // 已登录且网络可用时，创建/修改今日学习数据之前先尽力完成首次云端合并。
+  // 如果 Supabase 在当前网络不可达，不阻止离线学习；本地数据仍会保存，
+  // 恢复联网后由防回退合并规则补齐。
+  if (status?.signedIn && status?.online && !status?.initialSyncDone && cloud?.ensureInitialSync) {
+    try {
+      await cloud.ensureInitialSync();
+    } catch (error) {
+      console.warn("首次云端合并暂未完成，继续使用本地数据：", error);
+    }
+  }
+}
+
 async function startReview() {
   if (vocabulary.length === 0) {
     alert("词库尚未加载完成");
     return;
   }
 
+  await prepareCloudBeforeStudy();
   currentSession = await getTodaySession();
 
   if (!currentSession) {
@@ -936,8 +953,10 @@ async function renderDifficultWordsPage(items) {
   document.getElementById("startDifficultPracticeBtn")?.addEventListener("click", () => startDifficultPractice(items));
 }
 
-function startDifficultPractice(items) {
+async function startDifficultPractice(items) {
   if (!items.length) return;
+
+  await prepareCloudBeforeStudy();
 
   difficultPractice = {
     queue: items.map(item => ({ id: item.id, type: "primary" })),
@@ -1424,6 +1443,8 @@ async function showSettingsPage() {
     email: "",
     online: navigator.onLine,
     syncing: false,
+    initialSyncDone: false,
+    rollbackPreventionCount: 0,
     lastSyncAt: null,
     lastError: null
   };
@@ -1592,8 +1613,13 @@ function renderCloudSettingsCard(status) {
       <p class="settings-meta">
         ${status.lastSyncAt ? `上次完成同步：${formatDateTime(status.lastSyncAt)}` : "正在等待首次同步"}
       </p>
+      <p class="settings-meta">
+        防数据回退保护：已启用
+        ${status.initialSyncDone ? " · 首次云端合并已完成" : (status.online ? " · 首次云端合并进行中/待完成" : " · 当前离线，联网后补合并")}
+        ${status.rollbackPreventionCount ? ` · 本次运行已拦截 ${status.rollbackPreventionCount} 次低进度覆盖` : ""}
+      </p>
       <p class="settings-help">
-        每次“认识 / 忘了”、今日队列变化和阅读生词修改都会先写入本机 IndexedDB，再尝试同步到 Supabase。断网时继续学习；恢复联网、重新切回 App 或定时同步时会自动补齐。
+        每次“认识 / 忘了”、今日队列变化和阅读生词修改都会先写入本机 IndexedDB，再尝试同步到 Supabase。v2.1.2 不再单纯按“谁时间新”覆盖：每日进度和单词复习次数只能向前合并，低进度记录不能把高进度记录清零。断网时继续学习；恢复联网后自动补齐。
       </p>
       <div class="settings-action-grid">
         <button class="primary-button" id="cloudSyncNowBtn" type="button" ${status.syncing ? "disabled" : ""}>立即同步</button>
@@ -1895,7 +1921,7 @@ async function initApp() {
       return null;
     });
 
-    console.log("CET6 Review v2.1 初始化完成");
+    console.log("CET6 Review v2.1.2 初始化完成");
   } catch (error) {
     console.error("App 初始化失败：", error);
     alert("App 初始化失败，请打开浏览器开发者工具查看错误。");

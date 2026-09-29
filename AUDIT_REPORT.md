@@ -1,74 +1,55 @@
-# CET6 Review v2.1 · 云同步改造审计
+# CET6 Review v2.1.2 · 防回退同步审计
 
-## 改造范围
+## 问题
 
-v2.1 已将 v2.0 的 Firebase Authentication + Cloud Firestore 云同步完整替换为：
+v2.1.1 对同一个 `dailySessions` / `wordProgress` 冲突主要依赖更新时间判断。
+因此可能出现：
 
-- Supabase Auth（邮箱 / 密码）
-- Supabase Postgres Data API
-- Row Level Security (RLS)
-- 本地 IndexedDB offline-first
+- 云端已有有效学习进度；
+- 新设备或重新登录后本地先产生一条进度为 0 的新记录；
+- 这条空记录时间更新；
+- “新时间戳”被误判为“更正确的数据”。
 
-## 保留不变
+## v2.1.2 处理
 
-- 2003 核心词
-- 复习调度算法
-- 忘词回插
-- 今日总览
-- 重点易错
-- 阅读生词
-- 每日复习历史
-- 增强词典
-- PWA
-- JSON 手动备份
-- 原 IndexedDB 数据库名和结构
+### dailySessions
 
-因此从旧版本覆盖升级不会主动清空本机学习进度。
+采用学习进度优先的比较：
 
-## 云端模型
+1. `primaryCompleted`
+2. `cursor`
+3. `reinforcementAttempts`
+4. `completedAt`
+5. 只有学习进度完全相同时才使用时间戳决胜
 
-只使用一张表：
+队列、游标、认识/忘记计数、评分映射均从同一条更高进度记录取得，避免不同会话硬拼接。
 
-`public.cet6_sync_records`
+### wordProgress
 
-唯一键：
+采用累计学习量优先：
 
-`(user_id, store_name, record_key)`
+1. `reviewCount`
+2. `knowCount + forgotCount`
+3. `reinforcementCount`
+4. `correctionCount + reinforcementCorrectionCount`
+5. 学习量相同才比较时间戳
 
-其中 `payload` 使用 JSONB 保存本地记录。当前同步三个逻辑存储：
+累计计数使用不下降合并，核心状态（`lastRating`、`streak`、`nextReviewDate`）由更高学习进度记录决定。
 
-- `wordProgress`
-- `dailySessions`
-- `readingWords`
+### 首次登录
 
-## 冲突策略
+首次云端合并完成前，本地写操作不会直接把旧/空状态推到云端，而是先完成一次双向合并，再读取最新本地记录上传。
 
-- 每次操作始终先保存 IndexedDB
-- 在线时再尝试上传
-- 完整同步时按记录自身的 `updatedAt / lastReviewedAt / ...` 判断新旧
-- 较新的记录覆盖较旧记录
-- 阅读生词删除使用云端 tombstone，避免另一设备把已删除项目重新上传
+### 并发同步
 
-这个项目预期是一人多设备、通常一次只在一个设备学习。若两台设备在离线状态下同时修改同一个词，最终采用较新的记录时间作为冲突结果。
+登录、恢复网络、切回页面、定时同步可能同时触发。v2.1.2 使用共享 `syncPromise`，避免并发同步互相覆盖。
 
-## 自动同步触发
+## 自动测试
 
-- 登录后
-- App 启动时
-- 每次本地学习数据修改后
-- 恢复联网后
-- 浏览器窗口重新获得焦点
-- App 从后台切回前台
-- 约每 45 秒补偿同步
-- 设置页“立即同步”
+已验证以下冲突：
 
-## 安全
+- 新时间戳 `0 / 200` 不得覆盖旧时间戳 `2 / 200`。
+- 新时间戳低 `reviewCount` 不得覆盖旧时间戳高 `reviewCount`。
+- 高进度本地记录即使时间较旧，也不会被低进度云端记录清零。
 
-- 前端只需要 Project URL + publishable/anon key
-- 禁止使用 service_role / secret key
-- `supabase-schema.sql` 默认启用 RLS
-- 读写策略要求 `auth.uid() = user_id`
-
-## 离线行为
-
-Supabase 不替代 IndexedDB。即使 Supabase SDK、网络或云端暂时不可用，核心学习功能仍使用本地 IndexedDB 正常工作；联网后再补同步。
+所有 JavaScript 已通过 `node --check` 语法检查。

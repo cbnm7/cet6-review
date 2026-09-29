@@ -1,4 +1,4 @@
-# CET6 Review v2.1 · GitHub Pages 部署
+# CET6 Review v2.1.2 · GitHub Pages 部署
 
 ## 1. 上传工程
 

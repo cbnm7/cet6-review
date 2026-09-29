@@ -1,7 +1,7 @@
-// CET6 Review v2.1.1 - offline-first service worker
-const STATIC_CACHE = "cet6-review-v2.1.1-static-1";
-const RUNTIME_CACHE = "cet6-review-v2.1.1-runtime-1";
-const CLOUD_SDK_CACHE = "cet6-review-v2.1.1-supabase-sdk";
+// CET6 Review v2.1.2 - offline-first service worker
+const STATIC_CACHE = "cet6-review-v2.1.2-static-1";
+const RUNTIME_CACHE = "cet6-review-v2.1.2-runtime-1";
+const CLOUD_SDK_CACHE = "cet6-review-v2.1.2-supabase-sdk";
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
 const CORE_ASSETS = [
