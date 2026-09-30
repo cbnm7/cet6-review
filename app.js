@@ -1,11 +1,11 @@
 // =======================================
 // CET6 Review - app.js
-// v2.1.2 Supabase 多设备同步版
+// v2.1.3 精简词典版（保留 Supabase 多设备同步）
 // 每日队列 + IndexedDB + 二档复习 + 阅读生词
 // + 今日复习总览（三分类） + 重点易错 + 每日复习记录
 // =======================================
 
-const APP_VERSION = "2.1.2 Anti-Rollback Sync";
+const APP_VERSION = "2.1.3 精简词典版";
 
 const app = document.querySelector(".app");
 const homePageHTML = app.innerHTML;
@@ -247,7 +247,7 @@ async function showReviewPage() {
         ${isReinforcement ? '<span class="reinforcement-badge">本轮加练 · 明天仍会复习</span>' : ''}
       </div>
 
-      <p class="review-hint">先凭记忆判断，作答后显示释义、搭配和例句。</p>
+      <p class="review-hint">先凭记忆判断，作答后查看词性和精简释义。</p>
 
       <div class="rating-grid">
         <button class="rating-btn rating-forgot" data-rating="forgot">忘了</button>
@@ -624,17 +624,7 @@ async function buildTranslationEntryMap(terms) {
 }
 
 function renderTranslationDropdown(entry, fallbackTerm = "") {
-  const translations = (entry?.translations || []).filter(item => item?.translation);
-
-  const content = translations.length
-    ? translations.map(item => `
-        <div class="mini-translation-row">
-          ${item.type ? `<span class="pos-badge">${escapeHtml(item.type)}</span>` : ""}
-          <span>${escapeHtml(item.translation)}</span>
-        </div>
-      `).join("")
-    : `<div class="mini-translation-empty">“${escapeHtml(fallbackTerm)}”暂无本地中文释义</div>`;
-
+  const content = renderConciseTranslationRows(entry, fallbackTerm, "mini-translation-row");
   return `
     <details class="mini-translation-details">
       <summary>查看翻译</summary>
@@ -1021,7 +1011,7 @@ async function showDifficultPracticePage() {
         ${reinforcement ? '<span class="reinforcement-badge">专项加练</span>' : ''}
       </div>
 
-      <p class="review-hint">作答后查看完整释义、常见搭配和双语例句。</p>
+      <p class="review-hint">作答后查看词性和精简释义。</p>
 
       <div class="rating-grid">
         <button class="rating-btn rating-forgot difficult-rating-btn" data-rating="forgot">忘了</button>
@@ -1351,80 +1341,36 @@ function bindReadingWordsEvents() {
 
 
 // =======================================
-// 增强词典 UI / 设置
+// 精简本地词典 UI / 设置
 // =======================================
 
 function renderCompactPronunciation(entry) {
-  if (!entry) return '<div class="pronunciation-line pronunciation-missing">释义词典尚未匹配</div>';
-
+  if (!entry) return "";
   const parts = [];
   if (entry.us) parts.push(`<span><b>美</b> /${escapeHtml(entry.us)}/</span>`);
   if (entry.uk) parts.push(`<span><b>英</b> /${escapeHtml(entry.uk)}/</span>`);
+  return parts.length ? `<div class="pronunciation-line">${parts.join("")}</div>` : "";
+}
 
-  return parts.length
-    ? `<div class="pronunciation-line">${parts.join("")}</div>`
-    : '<div class="pronunciation-line pronunciation-missing">暂无音标</div>';
+function renderConciseTranslationRows(entry, fallbackTerm = "", rowClass = "translation-row") {
+  if (!entry) return `<p class="dictionary-empty">“${escapeHtml(fallbackTerm)}”没有内置释义，请检查是否完整更新了词典文件。</p>`;
+  const rows = (entry.translations || []).map(item => `
+    <div class="${rowClass}">
+      <span class="pos-badge">${escapeHtml(item.type)}</span>
+      <span>${escapeHtml(item.translation)}</span>
+    </div>`).join("");
+  const note = entry.note ? `<p class="lexical-note ${entry.needsReview ? "lexical-warning" : ""}">${entry.needsReview ? "词头待核对：" : "词性提示："}${escapeHtml(entry.note)}</p>` : "";
+  return rows + note;
 }
 
 function renderDictionaryCard(entry, fallbackTerm = "") {
-  if (!entry) {
-    return `
-      <section class="dictionary-card dictionary-card-missing">
-        <div class="dictionary-section-title">词典资料</div>
-        <p>“${escapeHtml(fallbackTerm)}”暂未匹配到本地增强词典。可到右上角设置中重新同步。少数异常词、专名或源词表噪声可能没有标准词典条目。</p>
-      </section>
-    `;
-  }
-
-  const translations = (entry.translations || []).length
-    ? entry.translations.map(item => `
-        <div class="translation-row">
-          ${item.type ? `<span class="pos-badge">${escapeHtml(item.type)}</span>` : ''}
-          <span>${escapeHtml(item.translation)}</span>
-        </div>
-      `).join("")
-    : '<p class="dictionary-empty">暂无中文释义</p>';
-
-  const phrases = (entry.phrases || []).slice(0, 5);
-  const phraseHtml = phrases.length
-    ? phrases.map(item => `
-        <div class="phrase-row">
-          <strong>${escapeHtml(item.phrase)}</strong>
-          <span>${escapeHtml(item.translation || "")}</span>
-        </div>
-      `).join("")
-    : '<p class="dictionary-empty">暂无常见搭配</p>';
-
-  const sentences = (entry.sentences || []).slice(0, 2);
-  const sentenceHtml = sentences.length
-    ? sentences.map(item => `
-        <div class="sentence-row">
-          <p>${escapeHtml(item.en)}</p>
-          ${item.cn ? `<span>${escapeHtml(item.cn)}</span>` : ''}
-        </div>
-      `).join("")
-    : '<p class="dictionary-empty">暂无双语例句</p>';
-
   return `
     <section class="dictionary-card">
       <div class="dictionary-section">
-        <div class="dictionary-section-title">核心释义</div>
-        <div class="translation-list">${translations}</div>
+        <div class="dictionary-section-title">词性与精简释义</div>
+        <div class="translation-list">${renderConciseTranslationRows(entry, fallbackTerm)}</div>
       </div>
-
-      <div class="dictionary-section">
-        <div class="dictionary-section-title">常见搭配</div>
-        <div class="phrase-list">${phraseHtml}</div>
-      </div>
-
-      <div class="dictionary-section">
-        <div class="dictionary-section-title">语境例句</div>
-        <div class="sentence-list">${sentenceHtml}</div>
-      </div>
-
-      <div class="dictionary-source-note">
-        数据源：${escapeHtml((entry.sources || []).join(" / ") || "本地词典")} · v1.5补全规则
-      </div>
+      <div class="dictionary-source-note">本地精简词典 · 常用义优先 · v2.1.3</div>
     </section>
   `;
 }
@@ -1471,22 +1417,21 @@ async function showSettingsPage() {
     ${renderCloudSettingsCard(cloudStatus)}
 
     <section class="today-card settings-card">
-      <p class="section-label">增强词典</p>
+      <p class="section-label">精简本地词典</p>
       <div class="dictionary-coverage-head">
-        <strong>${coverage.matched} / ${coverage.target}</strong>
-        <span>${coverage.percent}% 已匹配</span>
-      </div>
-      <div class="progress-bar dictionary-progress">
-        <div class="progress-value" style="width:${coverage.percent}%"></div>
+        <strong>${coverage.reviewed} / ${coverage.target}</strong>
+        <span>词头已整理</span>
       </div>
       <p class="settings-help">
-        固定短语与少量特殊词已随 App 内置中文释义；普通单词会从公开词库补全词性、音标、搭配和例句。首次完整同步需要联网，之后保存在 IndexedDB 中，可离线使用。
+        ${coverage.matched} 个词头有精简释义，${coverage.flagged} 个疑似异常词头单独提示。相同词性的释义合并展示，不设固定条数；保留六级和考研阅读常用义，不把词典全部冷僻用法塞进来。
+      </p>
+      <p class="settings-help">
+        词性和释义随 App 完整内置，无须再同步远端词典。额外搭配和例句已移除；原词表中的词组词头仍可正常复习。
       </p>
       <p class="settings-meta">
-        ${meta?.lastSyncAt ? `上次同步：${formatDateTime(meta.lastSyncAt)}` : "尚未完成同步"}
-        ${meta?.errors?.length ? ` · ${meta.errors.length} 个数据源失败` : ""}
+        词典版本：v2.1.3 · ${meta?.lastSyncAt ? `本地更新：${formatDateTime(meta.lastSyncAt)}` : "本地词典就绪"}
       </p>
-      <button class="primary-button" id="syncDictionaryBtn">${coverage.percent >= 95 ? "重新同步增强词典" : "同步增强词典"}</button>
+      <button class="primary-button" id="syncDictionaryBtn">重新载入本地词典</button>
       <div id="dictionarySyncMessage" class="sync-message"></div>
     </section>
 
@@ -1499,7 +1444,7 @@ async function showSettingsPage() {
         <span class="status-pill ${networkClass}">${networkLabel}</span>
       </div>
       <p class="settings-help">
-        首次打开和更新版本需要联网。完成缓存后，核心复习、学习记录、阅读生词和已同步词典均可离线使用。
+        首次打开和更新版本需要联网。完成缓存后，核心复习、学习记录、阅读生词和内置精简释义均可离线使用。
       </p>
       <p class="settings-meta">
         ${pwaStatus.installed ? "当前已以独立 App 模式运行。" : "当前处于浏览器模式。小米/Android 可使用浏览器菜单中的“安装应用”或“添加到主屏幕”。"}
@@ -1525,7 +1470,7 @@ async function showSettingsPage() {
     <section class="dictionary-source-card">
       <strong>CET6 Review · ${APP_VERSION}</strong>
       <p>IndexedDB 仍是每台设备的离线本地数据层；登录同一 Supabase 账号后，学习数据自动同步到 Postgres 云端表，再同步到其他设备。</p>
-      <p>2003 核心词和增强词典不是个人学习记录，不上传云端；云端仅保存复习进度、每日会话和阅读生词。</p>
+      <p>2003 核心词和精简词典不是个人学习记录，不上传云端；云端仅保存复习进度、每日会话和阅读生词。</p>
     </section>
   `;
 
@@ -1809,29 +1754,16 @@ async function syncDictionaryFromSettings() {
   const button = document.getElementById("syncDictionaryBtn");
   const message = document.getElementById("dictionarySyncMessage");
   if (!button || !message) return;
-
   button.disabled = true;
-  message.textContent = "正在连接公开词库…";
-
+  message.textContent = "正在重新载入内置词性和精简释义…";
   try {
-    const result = await syncDictionaryForVocabulary(vocabulary, {
-      onProgress(info) {
-        if (info.stage === "fetching") {
-          message.textContent = `正在同步 ${info.source}（${info.current}/${info.total}）…`;
-        } else if (info.stage === "parsed" && info.coverage) {
-          message.textContent = `${info.source} 完成，当前匹配 ${info.coverage.matched}/${info.coverage.target}`;
-        }
-      }
-    });
-
+    const result = await syncDictionaryForVocabulary(vocabulary, { force: true });
     lastDictionaryCoverage = result.coverage;
-    message.textContent = `同步完成：${result.coverage.matched}/${result.coverage.target}，覆盖率 ${result.coverage.percent}%`;
-    button.textContent = "同步完成";
-
-    setTimeout(showSettingsPage, 900);
+    message.textContent = `已载入 ${result.coverage.reviewed} 个词头；${result.coverage.flagged} 个词头待核对。没有访问在线词典。`;
   } catch (error) {
-    console.error("增强词典同步失败：", error);
-    message.textContent = `同步失败：${error.message || error}`;
+    console.error("本地词典载入失败：", error);
+    message.textContent = `载入失败：${error.message || error}`;
+  } finally {
     button.disabled = false;
   }
 }
@@ -1903,25 +1835,11 @@ async function initApp() {
     currentSession = await getTodaySession();
     await refreshHomeStats();
 
-    // 首次启动后台初始化增强词典。失败不会影响背词主流程。
-    dictionarySyncTask = ensureDictionaryData(vocabulary, {
-      minPercent: 100,
-      onProgress(info) {
-        if (info.stage === "parsed" && info.coverage) {
-          lastDictionaryCoverage = info.coverage;
-          console.log(`增强词典：${info.coverage.matched}/${info.coverage.target}`);
-        }
-      }
-    }).then(result => {
-      if (result?.coverage) lastDictionaryCoverage = result.coverage;
-      console.log("增强词典初始化完成：", result?.coverage || result);
-      return result;
-    }).catch(error => {
-      console.warn("增强词典自动同步失败，主功能仍可正常使用：", error);
-      return null;
-    });
+    // 词性和释义已由上面的 seedLocalDictionarySupplements 完成本地迁移。
+    // 不再后台抓取或合并第三方词典，防止重新混入重复/错配义项。
+    lastDictionaryCoverage = await getDictionaryCoverage(vocabulary);
 
-    console.log("CET6 Review v2.1.2 初始化完成");
+    console.log("CET6 Review v2.1.3 初始化完成");
   } catch (error) {
     console.error("App 初始化失败：", error);
     alert("App 初始化失败，请打开浏览器开发者工具查看错误。");

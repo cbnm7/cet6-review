@@ -1,0 +1,7 @@
+{
+  "mode": "Service Worker mocked CacheStorage/fetch unit test; not device E2E",
+  "staticAssets": 19,
+  "offlineHtml": true,
+  "offlineBundledDictionary": true,
+  "unrelatedCachePreserved": true
+}

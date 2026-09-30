@@ -1,7 +1,7 @@
-// CET6 Review v2.1.2 - offline-first service worker
-const STATIC_CACHE = "cet6-review-v2.1.2-static-1";
-const RUNTIME_CACHE = "cet6-review-v2.1.2-runtime-1";
-const CLOUD_SDK_CACHE = "cet6-review-v2.1.2-supabase-sdk";
+// CET6 Review v2.1.3 - offline-first service worker
+const STATIC_CACHE = "cet6-review-v2.1.3-static-1";
+const RUNTIME_CACHE = "cet6-review-v2.1.3-runtime-1";
+const CLOUD_SDK_CACHE = "cet6-review-v2.1.3-supabase-sdk";
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
 const CORE_ASSETS = [
@@ -11,6 +11,8 @@ const CORE_ASSETS = [
   "./scheduler.js",
   "./db.js",
   "./dictionary.js",
+  "./data/concise-dictionary.js",
+  "./data/concise-dictionary.json",
   "./backup.js",
   "./pwa.js",
   "./supabase-config.js",
@@ -31,7 +33,11 @@ self.addEventListener("install", event => {
       // Supabase SDK 属于云同步增强能力。预缓存失败不能阻止 PWA 安装。
       caches.open(CLOUD_SDK_CACHE).then(async cache => {
         try {
-          const response = await fetch(SUPABASE_SDK_URL, { mode: "cors" });
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 8000);
+          let response;
+          try { response = await fetch(SUPABASE_SDK_URL, { mode: "cors", signal: controller.signal }); }
+          finally { clearTimeout(timeout); }
           if (response && response.ok) {
             await cache.put(SUPABASE_SDK_URL, response.clone());
           }
@@ -48,7 +54,7 @@ self.addEventListener("activate", event => {
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(key => ![STATIC_CACHE, RUNTIME_CACHE, CLOUD_SDK_CACHE].includes(key))
+          .filter(key => key.startsWith("cet6-review-") && ![STATIC_CACHE, RUNTIME_CACHE, CLOUD_SDK_CACHE].includes(key))
           .map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
@@ -122,7 +128,6 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // 公开增强词典与 Supabase API 请求保持网络访问；
-  // 解析后的词典和所有学习数据仍会先保存到 IndexedDB。
+  // Supabase API 请求保持网络访问；本地词典不发起跨域请求。
   event.respondWith(fetch(request));
 });

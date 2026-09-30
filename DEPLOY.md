@@ -1,3 +1,9 @@
+# v2.1.3 本次更新
+
+这次只更新词典与对应界面；不需要重新执行 Supabase SQL。先导出学习备份，再将本目录内容覆盖原 GitHub 仓库根目录，务必上传新增的 data/concise-dictionary.js 与 .json。等部署完成后，联网关闭旧页面并重新打开；设置页应显示 2.1.3。不要清除网站数据。
+
+---
+
 # CET6 Review v2.1.2 · GitHub Pages 部署
 
 ## 1. 上传工程

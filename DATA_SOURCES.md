@@ -1,50 +1,34 @@
-# 数据来源与审校说明（v1.3）
+# v2.1.3 数据来源与核查方式
 
-## 核心词表
+## 本次真正使用的数据
 
-`data/cet6_2003.json` 继续沿用此前确认的 2003 条源顺序，不改变复习调度顺序。
+1. **用户上传的主词表** `data/cet6_2003.json`：2003 条记录，1992 个唯一词头。原文件不改。
+2. **本次逐词编辑的释义**：`data/concise-dictionary.json`；语义取舍和中文简明表述由模型逐条编辑。不是取得了一套官方“六级/考研所有应考义项”的授权词库。
+3. **本地辅助词性词表**：TextBlob 包内 `en/en-lexicon.txt`（Brill tagger / Brown、Penn Treebank 常见标签及扩充数据）。用于发现值得复查的 POS 提示，不充当完整多词性词典，不将其整库打包。
+4. **定点查询的词典原站**：仅下表所列词头完成此轮外部查询。中文释义为重新概括，没有复制长段词典定义或例句。
 
-源文件中存在少量历史噪声：
+| 核查目标 | 原站 |
+|---|---|
+| principal | https://www.merriam-webster.com/dictionary/principal |
+| underly / underlying 对照 underlie | https://www.merriam-webster.com/dictionary/underlie |
+| content | https://www.merriam-webster.com/dictionary/content |
+| provided | https://www.merriam-webster.com/dictionary/provided |
+| given | https://www.merriam-webster.com/dictionary/given |
+| rival | https://www.merriam-webster.com/dictionary/rival |
+| retail | https://www.merriam-webster.com/dictionary/retail |
+| retail 对照不同词典的修饰语分类 | https://www.oxfordlearnersdictionaries.com/definition/english/retail_1 |
 
-- 11 个词头重复出现：`air / bear / compliment / confidence / council / device / hole / perspective / principal / route / site`
-- 3 个明显需要人工说明的源词头：`mir / 4th / lehman`
+查询/整理日期：2026-09-30。
 
-为了不破坏已经建立的复习顺序，本版不擅自删除或替换这些位置：重复词共用同一标准词典释义；`4th` 标注为 `fourth` 的数字写法；`mir`、`lehman` 明确标记为源词表异常/专名，不编造普通六级释义。
+## 与旧版区别
 
-## 增强词典
+旧版从 KyleBing/english-vocabulary 的九套 TSV 拉取数据，随后合并相同词头的词性、释义、搭配与例句。本版运行时不再请求或合并这些远端词典。
 
-程序从公开项目 `KyleBing/english-vocabulary` 的六级、四级、考研、高中词库中按需同步：
+ECDICT、WordNet 的项目说明曾用于前期评估，但本轮没有取得并逐词查询它们的完整数据，因此它们不列为这份释义逐词核查的证据。
 
-- 英/美音标
-- 词性与中文释义
-- 短语搭配及中文释义
-- 双语例句
+## 保留与限制
 
-同步数据只保留与本项目核心词匹配的条目，并缓存在浏览器 IndexedDB。
-
-## v1.3 审校规则
-
-原始公开词典适合“查词”，但并非每一条短语都适合六级背诵。例如 `said to contain → 据称内装` 是海运提单领域的固定表述，在特定法律/运输语境中并非错误，但作为普通 `contain` 的六级常见搭配会造成误导。因此 v1.3 新增学习向质量层：
-
-1. 中文释义优先保留通用义项，弱化网络义、专名、过度专业义。
-2. 每个词最多展示 5 个高价值短语；短语必须真正包含目标词并具有一般学习价值。
-3. 过滤法律、医学、化学、计算机等过度专业的短语释义，以及数字/公式型噪声。
-4. `said to contain` 不再作为 `contain` 的常规搭配展示。
-5. 每个词最多展示 2 个较短、含目标词、且中英文都有内容的语境例句。
-6. 过滤 URL、论文题目式、数字密集、过长或翻译明显不适合作为学习例句的条目。
-7. 已缓存的旧增强词典会自动升级到数据库 v2，并重新同步，避免旧的不恰当条目继续显示。
-
-## 参考核验
-
-- `KyleBing/english-vocabulary`：本 App 的短语、例句、音标与基础中文释义上游。
-- `ECDICT`：MIT License 的开放英汉双解词典；用于核验公开英汉词典字段设计和通用释义原则。
-- `Open English WordNet`：CC BY 4.0 的开放英文词汇数据库；用于英文词义核验参考。
-
-v1.3 不接入收费 API，也不会在运行时调用大模型生成“看起来像标准答案”的释义。
-
-
-## v1.5 补充策略
-
-- App 内置固定短语/多词表达的人工中文核心释义，保证这些词条在离线状态下也有解释。
-- 在线同步来源扩展为 KyleBing/english-vocabulary 的六级、四级、考研、高中、雅思、托福、专八、SAT、GRE 词库。
-- 本地补充与在线数据会合并：本地核心义不会因为远端缺条目而消失，远端命中时仍可补充音标、搭配与例句。
+- 旧词典缓存中已有的音标可延续显示，本轮没有重新审校每个音标。不会把旧中文释义重新混入。
+- 已有阅读生词中的中文义、原句和备注是用户内容，未被模型批量覆盖。
+- 缺少可靠来源的词头会提示待核对，不因为“覆盖率”指标而硬配释义。
+- 词性可随上下文变化；本版兼列的是有用常见词性，不是所有历史或专门领域用法的清单。
