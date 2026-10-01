@@ -1,62 +1,11 @@
-# v2.1.3 本次更新
+# 部署 v2.2.1
 
-这次只更新词典与对应界面；不需要重新执行 Supabase SQL。先导出学习备份，再将本目录内容覆盖原 GitHub 仓库根目录，务必上传新增的 data/concise-dictionary.js 与 .json。等部署完成后，联网关闭旧页面并重新打开；设置页应显示 2.1.3。不要清除网站数据。
+先在原 App 中导出独立 JSON 备份。将本包 `CET6-Review/` **里面的内容**覆盖原仓库对应位置，保持原网站地址和 `supabase-config.js` 配置，不需要重新执行 Supabase SQL。
 
----
+运行所需文件为根目录 HTML/CSS/JS、`manifest.json`、`data/` 与 `icons/`，以及 GitHub Pages 使用的 `.nojekyll`。`tests/` 与文档用于核查，不被 App 自动执行。
 
-# CET6 Review v2.1.2 · GitHub Pages 部署
+等待 Pages 部署完成，关闭其它旧 CET6 页面/PWA，在电脑和手机联网打开原网址。设置页底部应显示 **2.2.1 数据保护与渐进加练版**。词典版本继续显示 v2.1.3，词典内容未改。
 
-## 1. 上传工程
+未即时更新时，关闭重开/普通刷新；新版可点设置中的“检查 App 更新”。不要清除网站数据、IndexedDB 或重置学习记录。所有设备都需要停止使用旧版本。
 
-将本目录中的文件上传到 GitHub 仓库根目录。建议仓库名：
-
-`CET6-Review`
-
-不要只上传外层文件夹；仓库根目录应直接看到：
-
-- `index.html`
-- `app.js`
-- `db.js`
-- `cloud-sync.js`
-- `supabase-config.js`
-- `service-worker.js`
-- `manifest.json`
-- `data/`
-- `icons/`
-
-## 2. 开启 Pages
-
-GitHub 仓库：
-
-`Settings -> Pages`
-
-选择从 `main` 分支根目录部署。
-
-最终地址通常类似：
-
-`https://你的用户名.github.io/CET6-Review/`
-
-## 3. 配置 Supabase
-
-先按 `SUPABASE_SETUP.md`：
-
-1. 创建 Supabase 项目
-2. 执行 `supabase-schema.sql`
-3. 开启 Email Auth
-4. 将 GitHub Pages 地址设置为 Auth Site URL（启用邮件确认时尤其重要）
-5. 在 App 设置页填写 Project URL + Publishable key
-
-## 4. 小米手机安装
-
-使用 Chrome / Edge 打开 GitHub Pages 地址。
-
-可通过：
-
-- 浏览器菜单 -> 安装应用
-- 或 添加到主屏幕
-
-安装后核心复习可离线使用；云同步需要网络。
-
-## 5. 更新版本
-
-以后只需覆盖 GitHub 仓库文件。Service Worker 会更新静态缓存，不会主动删除 IndexedDB 学习记录。
+详见 `V2.2.1_UPGRADE.md`。交付的是完整工程，未代为上传或发布。

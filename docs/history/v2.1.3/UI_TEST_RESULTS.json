@@ -1,0 +1,52 @@
+{
+  "testMode": "Chromium DOM rendering with test-only async IndexedDB mock; real URL navigation is blocked by environment policy. No real cloud calls.",
+  "study_db_unchanged_by_dictionary_migration": true,
+  "old_cache_replacement": {
+    "coverage": {
+      "target": 1992,
+      "matched": 1989,
+      "reviewed": 1992,
+      "flagged": 3,
+      "missing": 0,
+      "percent": 99.8,
+      "version": "2.1.3-concise-1"
+    },
+    "size": 1992,
+    "invalid": 0,
+    "entry": {
+      "term": "individual",
+      "key": "individual",
+      "normalizedTerm": "individual",
+      "translations": [
+        {
+          "type": "n.",
+          "translation": "个人；个体"
+        },
+        {
+          "type": "adj.",
+          "translation": "单独的；个别的"
+        }
+      ],
+      "needsReview": false,
+      "note": "",
+      "qualityVersion": "2.1.3-concise-1",
+      "sources": [
+        "本地精简词典 · v2.1.3"
+      ],
+      "us": "ˌɪndɪˈvɪdʒuəl",
+      "uk": ""
+    }
+  },
+  "answer_correction_and_both_list_dropdowns": true,
+  "personal_reading_sentence_and_note_preserved": true,
+  "mobile_widths_no_horizontal_overflow": [
+    360,
+    390,
+    480
+  ],
+  "dictionary_lookup_and_reload_do_not_need_fetch": true,
+  "page_errors": [],
+  "fetch_calls_before_network_disabled": [
+    "./data/cet6_2003.json"
+  ]
+}

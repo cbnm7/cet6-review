@@ -1,11 +1,11 @@
 // =======================================
 // CET6 Review - app.js
-// v2.1.3 精简词典版（保留 Supabase 多设备同步）
+// v2.2.1 分轮学习 + 遗忘词间隔复习（保留 Supabase 多设备同步）
 // 每日队列 + IndexedDB + 二档复习 + 阅读生词
 // + 今日复习总览（三分类） + 重点易错 + 每日复习记录
 // =======================================
 
-const APP_VERSION = "2.1.3 精简词典版";
+const APP_VERSION = "2.2.1 数据保护与渐进加练版";
 
 const app = document.querySelector(".app");
 const homePageHTML = app.innerHTML;
@@ -14,6 +14,7 @@ let vocabulary = [];
 let vocabularyMap = new Map();
 let currentSession = null;
 let isSaving = false;
+window.CET6CanReload = () => !isSaving && !studyBackupImportInProgress;
 let dictionarySyncTask = null;
 let lastDictionaryCoverage = null;
 
@@ -121,6 +122,9 @@ async function createTodaySession() {
 
   const session = {
     date: getLocalDateKey(),
+    schedulerVersion: SCHEDULER_VERSION,
+    stateRevision: 1,
+    needsRegeneration: false,
     queue: plan.items,
     cursor: 0,
     initialPrimaryCount: plan.items.length,
@@ -165,7 +169,8 @@ async function startReview() {
   await prepareCloudBeforeStudy();
   currentSession = await getTodaySession();
 
-  if (!currentSession) {
+  if (!currentSession || currentSession.needsRegeneration ||
+      (currentSession.date >= SCHEDULER_V2_RESET_DATE && !(Number(currentSession.schedulerVersion) >= SCHEDULER_VERSION))) {
     currentSession = await createTodaySession();
   }
 
@@ -216,6 +221,7 @@ async function showReviewPage() {
   const totalAttempts = currentSession.queue.length;
   const progress = Math.round((currentSession.cursor / totalAttempts) * 100);
   const isReinforcement = item.type === "reinforcement";
+  const isScheduledReview = item.type === "review";
 
   app.innerHTML = `
     <header class="topbar">
@@ -244,7 +250,8 @@ async function showReviewPage() {
         <p class="review-word-type">WORD</p>
         <div class="review-word">${escapeHtml(word.term)}</div>
         ${renderCompactPronunciation(dictionaryEntry)}
-        ${isReinforcement ? '<span class="reinforcement-badge">本轮加练 · 明天仍会复习</span>' : ''}
+        ${isReinforcement ? '<span class="reinforcement-badge">当天遗忘加练</span>' : ''}
+        ${isScheduledReview ? '<span class="reinforcement-badge">遗忘词 · 到期间隔复习</span>' : ''}
       </div>
 
       <p class="review-hint">先凭记忆判断，作答后查看词性和精简释义。</p>
@@ -255,8 +262,8 @@ async function showReviewPage() {
       </div>
 
       <div class="review-stats">
-        <span>首轮忘了 ${currentSession.forgot}</span>
-        <span>首轮认识 ${currentSession.know}</span>
+        <span>正式任务忘了 ${currentSession.forgot}</span>
+        <span>正式任务认识 ${currentSession.know}</span>
         <span>加练 ${currentSession.reinforcementAttempts}</span>
       </div>
     </section>
@@ -288,39 +295,42 @@ async function rateCurrentWord(rating) {
     const item = currentSession.queue[currentSession.cursor];
     const word = vocabularyMap.get(item.id);
 
-    if (!word) {
-      throw new Error(`找不到词条：${item.id}`);
-    }
+    if (!word) throw new Error(`找不到词条：${item.id}`);
 
-    const wasReinforcement = item.type === "reinforcement";
+    const itemType = item.type || "primary";
     ensureSessionCompat(currentSession);
 
-    if (item.type === "primary") {
-      await savePrimaryWordRating(word, rating);
+    if (itemType === "primary" || itemType === "review") {
+      await savePlannedWordRating(word, rating, itemType);
       currentSession.primaryCompleted++;
       currentSession.primaryRatings[word.id] = rating;
 
       if (rating === "forgot") {
         currentSession.forgot++;
-
-        if (!currentSession.reinsertedIds.includes(word.id)) {
-          insertReinforcement(
-            currentSession.queue,
-            currentSession.cursor,
-            word.id,
-            REINFORCEMENT_GAP
-          );
-          currentSession.reinsertedIds.push(word.id);
-        }
+        insertReinforcement(
+          currentSession.queue,
+          currentSession.cursor,
+          word.id
+        );
       } else {
         currentSession.know++;
       }
     } else {
       await saveReinforcementAttempt(word, rating);
       currentSession.reinforcementAttempts++;
+
+      // 当天加练再次忘记：继续稍后插回，直到某次加练选择“认识”。
+      if (rating === "forgot") {
+        insertReinforcement(
+          currentSession.queue,
+          currentSession.cursor,
+          word.id
+        );
+      }
     }
 
     currentSession.cursor++;
+    currentSession.stateRevision = Math.max(0, Number(currentSession.stateRevision) || 0) + 1;
     currentSession.updatedAt = new Date().toISOString();
 
     if (currentSession.cursor >= currentSession.queue.length) {
@@ -328,7 +338,7 @@ async function rateCurrentWord(rating) {
     }
 
     await saveDailySession(currentSession);
-    await showRatedAnswerPage(word, rating, wasReinforcement);
+    await showRatedAnswerPage(word, rating, itemType);
   } catch (error) {
     console.error("保存复习记录失败：", error);
     alert("复习记录保存失败，请重试。");
@@ -338,7 +348,9 @@ async function rateCurrentWord(rating) {
   }
 }
 
-async function showRatedAnswerPage(word, rating, wasReinforcement = false) {
+async function showRatedAnswerPage(word, rating, itemType = "primary") {
+  const wasReinforcement = itemType === "reinforcement";
+  const wasScheduledReview = itemType === "review";
   const dictionaryEntry = await getDictionaryEntry(word.term);
   const nextLabel = currentSession?.completedAt ? "查看今日结果" : "下一个词";
 
@@ -364,7 +376,8 @@ async function showRatedAnswerPage(word, rating, wasReinforcement = false) {
         </span>
       </div>
 
-      ${wasReinforcement ? '<p class="answer-reinforcement-note">这是本轮加练；加练结果不会覆盖明天的复习安排。</p>' : ''}
+      ${wasReinforcement ? '<p class="answer-reinforcement-note">这是当天遗忘加练；连续忘记按隔 10 → 25 → 50 个词 → 队尾安排，队列不足时放在队尾。</p>' : ''}
+      ${wasScheduledReview ? '<p class="answer-reinforcement-note">这是遗忘词到期间隔复习；认识后进入下一间隔阶段。</p>' : ''}
 
       ${renderDictionaryCard(dictionaryEntry, word.term)}
 
@@ -378,7 +391,7 @@ async function showRatedAnswerPage(word, rating, wasReinforcement = false) {
   document.getElementById("answerBackBtn")?.addEventListener("click", showHomePage);
 
   document.getElementById("markMistakeBtn")?.addEventListener("click", async () => {
-    await correctTodayAnswerToForgot(word, wasReinforcement);
+    await correctTodayAnswerToForgot(word, itemType);
   });
 
   document.getElementById("nextAfterAnswerBtn")?.addEventListener("click", () => {
@@ -390,7 +403,7 @@ async function showRatedAnswerPage(word, rating, wasReinforcement = false) {
   });
 }
 
-async function correctTodayAnswerToForgot(word, wasReinforcement = false) {
+async function correctTodayAnswerToForgot(word, itemType = "primary") {
   if (isSaving || !currentSession) return;
   isSaving = true;
 
@@ -400,36 +413,36 @@ async function correctTodayAnswerToForgot(word, wasReinforcement = false) {
   if (nextBtn) nextBtn.disabled = true;
 
   try {
-    if (wasReinforcement) {
+    if (itemType === "reinforcement") {
       await correctReinforcementKnowToForgot(word);
+      insertReinforcement(
+        currentSession.queue,
+        Math.max(0, currentSession.cursor - 1),
+        word.id
+      );
     } else {
-      await correctPrimaryKnowToForgot(word);
+      await correctPrimaryKnowToForgot(word, itemType);
 
       currentSession.know = Math.max(0, (currentSession.know || 0) - 1);
       currentSession.forgot = (currentSession.forgot || 0) + 1;
       currentSession.primaryRatings[word.id] = "forgot";
 
-      if (!currentSession.reinsertedIds.includes(word.id)) {
-        insertReinforcement(
-          currentSession.queue,
-          Math.max(0, currentSession.cursor - 1),
-          word.id,
-          REINFORCEMENT_GAP
-        );
-        currentSession.reinsertedIds.push(word.id);
-      }
-
-      // 如果这个词原本是本轮最后一个，“记错了”会新增一次加练，
-      // 因此今日任务不能继续保持“已完成”。
-      if (currentSession.cursor < currentSession.queue.length) {
-        currentSession.completedAt = null;
-      }
+      insertReinforcement(
+        currentSession.queue,
+        Math.max(0, currentSession.cursor - 1),
+        word.id
+      );
     }
 
+    if (currentSession.cursor < currentSession.queue.length) {
+      currentSession.completedAt = null;
+    }
+
+    currentSession.stateRevision = Math.max(0, Number(currentSession.stateRevision) || 0) + 1;
     currentSession.updatedAt = new Date().toISOString();
     await saveDailySession(currentSession);
 
-    await showRatedAnswerPage(word, "forgot", wasReinforcement);
+    await showRatedAnswerPage(word, "forgot", itemType);
   } catch (error) {
     console.error("更正为忘了失败：", error);
     alert("更正失败，请重试。");
@@ -466,7 +479,7 @@ function showFinishPage() {
     <section class="today-card">
       <div class="finish-total">
         <strong>${currentSession.initialPrimaryCount || 0}</strong>
-        <span>今日首轮复习词</span>
+        <span>今日正式任务词</span>
       </div>
 
       <div class="finish-grid">
@@ -476,7 +489,7 @@ function showFinishPage() {
 
       <p class="finish-note">
         本轮加练 ${currentSession.reinforcementAttempts || 0} 次。<br>
-        今日计划：忘记词 ${meta.forgottenDue || 0}，到期已认识词 ${meta.knownDueAdded || 0}，顺序新增 ${meta.newAdded || 0}。
+        今日计划：到期遗忘词 ${meta.forgottenDue || 0}，第 ${meta.currentRound || 1} 轮补充 ${meta.roundAdded || 0} 个（其中首次新词 ${meta.newAdded || 0}）。
       </p>
 
       <button class="primary-button" id="finishBtn">返回首页</button>
@@ -588,7 +601,7 @@ function renderDailyHistoryPage(sessions) {
     </section>
 
     <section class="daily-history-note">
-      <p>这里记录的是每天真正完成首轮判断的词数，而不是固定目标。比如今天只做到100词就退出，今天会保存为100；昨天做完200词，则昨天显示200。</p>
+      <p>这里记录的是每天真正完成正式任务判断的词数，而不是固定目标。比如今天只做到100词就退出，今天会保存为100；昨天做完200词，则昨天显示200。</p>
     </section>
 
     <section class="daily-history-list">
@@ -643,14 +656,14 @@ async function showTodayOverviewPage() {
   const progressRecords = await getAllWordProgress();
   const recordMap = new Map(progressRecords.map(record => [record.id, record]));
 
-  let session = savedSession;
+  let session = savedSession?.needsRegeneration ? null : savedSession;
   let primaryItems;
   let meta;
   let isPreview = false;
 
   if (session) {
     ensureSessionCompat(session);
-    primaryItems = session.queue.filter(item => item.type === "primary");
+    primaryItems = session.queue.filter(item => item.type !== "reinforcement");
     meta = session.planMeta || {};
   } else {
     const plan = buildDailyPrimaryQueue(vocabulary, progressRecords, DAILY_TARGET);
@@ -777,7 +790,7 @@ async function showTodayOverviewPage() {
 
     <section class="overview-plan-card">
       <p>
-        今日计划 ${total} 词 · 忘记词 ${meta.forgottenDue || 0} · 到期已认识 ${meta.knownDueAdded || 0} · 新词 ${meta.newAdded || 0}
+        今日计划 ${total} 词 · 到期遗忘词 ${meta.forgottenDue || 0} · 第 ${meta.currentRound || 1} 轮补充 ${meta.roundAdded || 0} · 首次新词 ${meta.newAdded || 0}
       </p>
       ${isPreview
         ? '<span>当前为计划预览，正式开始复习后锁定今日队列。所有单词暂归入“待复习”。</span>'
@@ -790,7 +803,7 @@ async function showTodayOverviewPage() {
         knownCount,
         "overview-board-know",
         knownItems,
-        "今天首轮已选择“认识”的单词"
+        "今天正式任务已选择“认识”的单词"
       )}
 
       ${renderOverviewBoard(
@@ -798,7 +811,7 @@ async function showTodayOverviewPage() {
         forgotCount,
         "overview-board-forgot",
         forgotItems,
-        "今天首轮选择“忘了”的单词"
+        "今天正式任务选择“忘了”的单词"
       )}
 
       ${renderOverviewBoard(
@@ -806,7 +819,7 @@ async function showTodayOverviewPage() {
         pendingCount,
         "overview-board-pending",
         pendingItems,
-        "今天尚未完成首轮判断的单词"
+        "今天尚未完成正式任务判断的单词"
       )}
     </div>
   `;
@@ -816,11 +829,8 @@ async function showTodayOverviewPage() {
 
 function describeTodayWordSource(wordId, meta, index, total) {
   const forgottenEnd = Number(meta.forgottenDue || 0);
-  const knownEnd = forgottenEnd + Number(meta.knownDueAdded || 0);
-
-  if (index < forgottenEnd) return "优先：到期忘记词";
-  if (index < knownEnd) return "到期复习词";
-  if (index < total) return "顺序补充新词";
+  if (index < forgottenEnd) return "优先：到期遗忘词";
+  if (index < total) return `第 ${Number(meta.currentRound || 1)} 轮顺序词`;
   return "今日复习";
 }
 
@@ -833,7 +843,7 @@ async function getDifficultWordsData() {
 
   return records
     .filter(record =>
-      record.lastRating === "forgot" ||
+      Boolean(record.remediationActive) ||
       Number(record.forgotCount || 0) >= 2
     )
     .map(record => {
@@ -845,7 +855,7 @@ async function getDifficultWordsData() {
         forgotRate: Number(record.reviewCount || 0) > 0
           ? Number(record.forgotCount || 0) / Number(record.reviewCount || 1)
           : 0,
-        currentForgotten: record.lastRating === "forgot"
+        currentForgotten: Boolean(record.remediationActive)
       };
     })
     .sort((a, b) => {
@@ -1047,26 +1057,29 @@ async function rateDifficultWord(rating) {
     const wasReinforcement = item.type === "reinforcement";
 
     if (item.type === "primary") {
-      await savePrimaryWordRating(word, rating);
+      await saveFocusPracticeAttempt(word, rating);
 
       if (rating === "forgot") {
         difficultPractice.forgot++;
 
-        if (!difficultPractice.reinsertedIds.includes(word.id)) {
-          insertReinforcement(
-            difficultPractice.queue,
-            difficultPractice.cursor,
-            word.id,
-            REINFORCEMENT_GAP
-          );
-          difficultPractice.reinsertedIds.push(word.id);
-        }
+        insertReinforcement(
+          difficultPractice.queue,
+          difficultPractice.cursor,
+          word.id
+        );
       } else {
         difficultPractice.know++;
       }
     } else {
       await saveReinforcementAttempt(word, rating);
       difficultPractice.reinforcementAttempts++;
+      if (rating === "forgot") {
+        insertReinforcement(
+          difficultPractice.queue,
+          difficultPractice.cursor,
+          word.id
+        );
+      }
     }
 
     difficultPractice.cursor++;
@@ -1140,21 +1153,17 @@ async function correctDifficultAnswerToForgot(word, wasReinforcement) {
     if (wasReinforcement) {
       await correctReinforcementKnowToForgot(word);
     } else {
-      await correctPrimaryKnowToForgot(word);
+      await saveFocusPracticeAttempt(word, "forgot");
 
       difficultPractice.know = Math.max(0, (difficultPractice.know || 0) - 1);
       difficultPractice.forgot = (difficultPractice.forgot || 0) + 1;
-
-      if (!difficultPractice.reinsertedIds.includes(word.id)) {
-        insertReinforcement(
-          difficultPractice.queue,
-          Math.max(0, difficultPractice.cursor - 1),
-          word.id,
-          REINFORCEMENT_GAP
-        );
-        difficultPractice.reinsertedIds.push(word.id);
-      }
     }
+
+    insertReinforcement(
+      difficultPractice.queue,
+      Math.max(0, difficultPractice.cursor - 1),
+      word.id
+    );
 
     await showDifficultRatedAnswerPage(word, "forgot", wasReinforcement);
   } catch (error) {
@@ -1450,6 +1459,7 @@ async function showSettingsPage() {
         ${pwaStatus.installed ? "当前已以独立 App 模式运行。" : "当前处于浏览器模式。小米/Android 可使用浏览器菜单中的“安装应用”或“添加到主屏幕”。"}
       </p>
       <button class="secondary-action-button" id="installAppBtn" ${pwaStatus.installed ? "disabled" : ""}>${installLabel}</button>
+      <button class="secondary-action-button" id="checkAppUpdateBtn">检查 App 更新</button>
       <div id="installMessage" class="sync-message"></div>
     </section>
 
@@ -1463,6 +1473,8 @@ async function showSettingsPage() {
         <button class="secondary-action-button" id="exportBackupBtn">导出备份</button>
         <button class="secondary-action-button" id="importBackupBtn">导入备份</button>
       </div>
+      <p class="settings-help">恢复会先在本机保留一份“导入前快照”，新版备份不会再次按旧日期迁移。成功导入后暂停自动云同步，核对恢复结果后再点“立即同步”进行合并。</p>
+      <button class="secondary-action-button" id="exportPreImportBackupBtn">导出上次导入前快照</button>
       <input id="backupFileInput" class="backup-file-input" type="file" accept="application/json,.json">
       <div id="backupMessage" class="sync-message"></div>
     </section>
@@ -1477,6 +1489,26 @@ async function showSettingsPage() {
   document.getElementById("settingsBackBtn")?.addEventListener("click", showHomePage);
   document.getElementById("syncDictionaryBtn")?.addEventListener("click", syncDictionaryFromSettings);
   document.getElementById("installAppBtn")?.addEventListener("click", handleInstallApp);
+  document.getElementById("checkAppUpdateBtn")?.addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const message = document.getElementById("installMessage");
+    button.disabled = true;
+    try {
+      const result = await checkPWAUpdate({ force: true });
+      message.textContent = !navigator.onLine ? "当前离线，请联网后检查更新。" :
+        (result.installing ? "新版正在缓存，就绪后会提示刷新；不必清除网站数据。" :
+          isNewerAppVersion(result.version) ? `新版本 ${result.version} 已就绪，请点击底部“刷新更新”。` :
+          result.checked ? `已检查更新，当前界面为 ${APP_VERSION}。` : "离线服务尚未就绪，请联网稍后再试。");
+    } catch (error) { message.textContent = `更新检查失败：${error.message || error}；现有学习记录不受影响。`; }
+    finally { button.disabled = false; }
+  });
+  document.getElementById("exportPreImportBackupBtn")?.addEventListener("click", async () => {
+    const message = document.getElementById("backupMessage");
+    try {
+      await exportPreImportBackup();
+      message.textContent = "已导出上次导入前的完整学习数据快照。";
+    } catch (error) { message.textContent = error.message || String(error); }
+  });
   document.getElementById("exportBackupBtn")?.addEventListener("click", handleExportBackup);
   document.getElementById("importBackupBtn")?.addEventListener("click", () => {
     document.getElementById("backupFileInput")?.click();
@@ -1534,7 +1566,7 @@ function renderCloudSettingsCard(status) {
           </div>
         </form>
         <button class="text-action-button" id="clearSupabaseConfigBtn" type="button">重新填写 Supabase 配置</button>
-        <div id="cloudMessage" class="sync-message">${status.lastError ? escapeHtml(status.lastError) : ""}</div>
+        <div id="cloudMessage" class="sync-message">${status.restoreSyncPaused ? "已恢复备份，自动云同步已暂停。请先核对本地数据，再点立即同步；同步会与云端合并，不是强制覆盖云端。" : (status.lastError ? escapeHtml(status.lastError) : "")}</div>
       </section>
     `;
   }
@@ -1571,7 +1603,7 @@ function renderCloudSettingsCard(status) {
         <button class="secondary-action-button" id="cloudLogoutBtn" type="button">退出账号</button>
       </div>
       <button class="text-action-button" id="clearSupabaseConfigBtn" type="button">更换 Supabase 项目</button>
-      <div id="cloudMessage" class="sync-message">${status.lastError ? escapeHtml(status.lastError) : ""}</div>
+      <div id="cloudMessage" class="sync-message">${status.restoreSyncPaused ? "已恢复备份，自动云同步已暂停。请先核对本地数据，再点立即同步；同步会与云端合并，不是强制覆盖云端。" : (status.lastError ? escapeHtml(status.lastError) : "")}</div>
     </section>
   `;
 }
@@ -1729,7 +1761,7 @@ async function handleImportBackup(event) {
   if (!file || !message) return;
 
   const confirmed = window.confirm(
-    "导入会用备份文件替换当前设备上的学习记录。恢复后如已登录 Supabase，会再与云端合并。\n\n确定继续吗？"
+    "导入会替换本机学习记录，并保留一份导入前快照。请先关闭其它 CET6 标签页/旧设备页面。\n\n导入成功后自动云同步会暂停，请先核对数据，再点“立即同步”进行合并。建议先导出一份独立 JSON 备份。\n\n确定继续吗？"
   );
 
   if (!confirmed) {
@@ -1741,7 +1773,7 @@ async function handleImportBackup(event) {
 
   try {
     await importStudyBackupFile(file);
-    message.textContent = "恢复成功，正在重新载入 App…";
+    message.textContent = "恢复成功；云同步已暂停供你核对，正在重新载入 App…";
     setTimeout(() => window.location.reload(), 700);
   } catch (error) {
     console.error("导入备份失败：", error);
@@ -1806,6 +1838,7 @@ window.addEventListener("cet6-cloud-data-updated", async () => {
 let cloudStatusRefreshTimer = null;
 
 window.addEventListener("cet6-cloud-status", event => {
+  if (studyBackupImportInProgress) return;
   // 修复 v2.1：首次同步完成后，设置页原先不会重绘，
   // 因而界面会一直停留在“同步中…”，即使后台已经完成。
   // 仅在“已登录”的设置页自动刷新；未登录/填写表单时不重绘，
@@ -1839,7 +1872,7 @@ async function initApp() {
     // 不再后台抓取或合并第三方词典，防止重新混入重复/错配义项。
     lastDictionaryCoverage = await getDictionaryCoverage(vocabulary);
 
-    console.log("CET6 Review v2.1.3 初始化完成");
+    console.log("CET6 Review v2.2.1 初始化完成");
   } catch (error) {
     console.error("App 初始化失败：", error);
     alert("App 初始化失败，请打开浏览器开发者工具查看错误。");

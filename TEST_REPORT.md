@@ -1,26 +1,62 @@
-# v2.1.3 实际检查记录
+# v2.2.1 实际测试报告
 
-## 已完成
+## 本次执行
 
-- 10 个运行所需 JavaScript 文件通过 `node --check`。
-- 主词表 2003 条 / 1992 个唯一词头；新词典覆盖全部词头，1989 个有释义、3 个待核对。每个词性一行，没有同词性重复行或同一行内完全重复的译项。
-- 运行时 JS 数据与可读 JSON 完全一致。
-- 7 个需保留的关键文件与上传版逐字节一致，SHA-256 见 `CHECK_RESULTS.json`。
-- Service Worker 的 19 个核心资源均存在，Python 本地 HTTP 实际请求均返回 200。
-- Chromium 实际 DOM/样式渲染与按钮交互：认识→解析→记错了、今日总览翻译下拉、重点易错翻译下拉、设置页本地词典重载，均通过。
-- 360 / 390 / 480 像素视口没有横向溢出，释义逐词性纵向排列。
-- 在异步 IndexedDB **模拟实现**中，以旧版 `normalizedTerm` 主键和包含错误 POS、旧搭配/例句的缓存作为输入：迁移后 1992 条新记录正常，旧附加字段为 0；旧音标保留；学习记录与阅读原句/备注未被迁移操作改变。
-- 将 `fetch` 设置为必然失败后，本地词典查询与重载仍可完成。测试过程中唯一词典相关资源请求是原主词表，不请求外部释义源。
-- Service Worker **模拟 CacheStorage/fetch 单元测试**：断网回退首页与内置词典正常；新版本删除本项目前缀旧缓存，不删除其它应用缓存。
+**Node.js v22.16.0：40 项自动化测试全部通过，0 失败。**
 
-## 未完成或不能据此声称的事项
+| 范围 | 数量 | 覆盖点 |
+| --- | ---: | --- |
+| 备份与迁移 | 10 | v2.2.0 schema1 恢复、v2.2.1 往返、重复导入、旧备份、混合备份、缺迁移标记、导入前快照、损坏文件拒绝、事务失败回滚、等待在途同步 |
+| 云同步合并 | 8 | 10 月 1 日及以后旧会话拒绝、历史保留、新版保留、真正新版优先、远端独有/本地独有/双方皆旧、上传路径保护 |
+| 调度与加练 | 9 | 160 认识+40 遗忘、237 到期溢出、恰好 200、轮次切换、10/25/50/队尾、旧队列兼容、短队列、跨天阶梯、加练不推进跨天阶段 |
+| Service Worker | 12 | 网络优先、最新缓存优先、404/500、超时、固定数据缓存优先、导航回退、缓存写失败、安装资产、安装失败、激活清理、API 不缓存、其它文件不污染首页 |
+| PWA 版本比较 | 1 | 不把较低版本 Worker 误报为新版本 |
 
-本运行环境的 Chromium 管理策略禁止真实 URL 导航，因此上面的 UI 检查采用 `about:blank` 注入实际页面代码，数据库检查使用测试专用模拟实现。它们**不是实际浏览器磁盘 IndexedDB、真实 Service Worker 生命周期或小米手机端到端验收**。模拟器没有放入生产工程，不会在用户 App 中运行。
+原始输出：`tests/REGRESSION_RESULTS.tap`。
 
-没有登录用户 Supabase、没有实测本次升级后的跨设备同步、没有替用户发布 GitHub。本次云同步代码原样保留，不为其此前已有的并发合并行为作新的保证。
+**Chromium 页面检查：13 项通过，未观察到未处理脚本异常。**
 
-词条全量整理及格式校验已经完成；只有 8 个重点词头另做了外部词典原站核查。不能把格式测试、“已整理 1992”或辅助 POS 标签命中视为每个义项的权威准确性认证。
+实际注入本工程页面、CSS 和运行脚本，验证首页与词典初始化、设置页版本与新按钮、忘记后插回、认识→记错了、加练纠错递增、重新读取会话、备份版本元信息、保存期间不强制刷新，以及 360 / 390 / 480 像素视口无横向溢出。
 
-## 更新后应看到的结果
+结果：`tests/UI_v2.2.1_RESULTS.json`；截图：`tests/UI_v2.2.1_settings.png`。
 
-设置页显示“2.1.3 精简词典版”；有释义的普通词作答后只显示词性和精简中文解释，无额外搭配/例句；原来的复习历史与账号继续存在。不要通过清除网站数据来解决旧版本缓存问题。
+全部生产 JavaScript 通过 `node --check`。核心资源清单 19 项文件均存在，HTML 引用与预缓存版本一致。原始词表、词典、配置和图标的字节一致性校验记录在 `CHECK_RESULTS.json`。
+
+## 环境与限制：不能把模拟测试说成真实设备验收
+
+本环境 Chromium 对 `http://127.0.0.1:8765/` 的导航返回 `ERR_BLOCKED_BY_ADMINISTRATOR`。因此页面测试采用 `about:blank` 注入实际页面代码，而不是正常网站导航。
+
+- IndexedDB：使用 `tests/support/memory-idb.cjs` 的有限异步内存替身；模拟提交、回滚和错误注入，**不是浏览器磁盘 IndexedDB 的完整实现或兼容性认证**。
+- Service Worker：在 Node VM 中执行本工程 Worker，使用 Request/Response 与内存 CacheStorage/fetch 替身；**没有验证真实注册、生命周期、GitHub CDN、Chrome 手机缓存或断网行为**。
+- 页面：真实 Chromium DOM/CSS/按钮执行；词库 fetch、本地存储与 IndexedDB 使用测试替身，Supabase 未配置。截图中的未配置状态仅属于测试环境，不代表交付工程配置被删除。
+- 云同步：执行实际过滤、合并、上传选择函数，远端 API 用测试桩；**没有登录用户账号，没有读写真实云端，也没有完成多设备并发端到端验收**。
+- 测试词记录为构造数据，不是用户真实学习记录。本次不宣称已证明用户第一天每个词的真实状态都已恢复。
+
+测试替身不出现在 `index.html` 或 Worker 预缓存清单中，不会被生产 App 加载。
+
+## 复跑
+
+在工程目录：
+
+```sh
+node --test tests/*.test.cjs
+```
+
+不需要 npm 安装。页面检查另需 Python Playwright 和 Chromium：
+
+```sh
+python tests/ui_smoke.py
+```
+
+可用 `CHROMIUM_PATH` 指定浏览器可执行文件。普通使用 App 无需这些开发工具。
+
+## 实现参考
+
+核心网络优先/离线回退按 Chrome 官方缓存策略文档设计；更新提示参考官方 Service Worker 生命周期和更新处理说明；导入以事务完成/中止作为成功/失败边界。
+
+- Chrome for Developers — Strategies for service worker caching：`https://developer.chrome.com/docs/workbox/caching-strategies-overview`
+- web.dev — The service worker lifecycle：`https://web.dev/articles/service-worker-lifecycle`
+- Chrome for Developers — Handling service worker updates with immediacy：`https://developer.chrome.com/docs/workbox/handling-service-worker-updates`
+- MDN — IDBTransaction / abort：`https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction`；`https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/abort`
+
+以上文档用于实现依据，不等于本项目已完成其覆盖的所有浏览器验证。

@@ -1,11 +1,14 @@
 // =======================================
-// CET6 Review v2.1 - Supabase 多设备云同步
+// CET6 Review v2.2.1 - Supabase 多设备云同步
 // 本地 IndexedDB 为离线主数据层；Supabase 负责账号与跨设备同步。
 // =======================================
 
 const CONFIG_STORAGE_KEY = "cet6-supabase-config-v1";
 const LAST_SYNC_STORAGE_KEY = "cet6-cloud-last-sync";
 const REMOTE_TABLE = "cet6_sync_records";
+const RESTORE_SYNC_PAUSE_KEY = "cet6-cloud-restore-paused";
+const activeLocalPushes = new Set();
+
 const AUTO_SYNC_INTERVAL_MS = 45 * 1000;
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
@@ -46,6 +49,8 @@ const state = {
   user: null,
   client: null,
   syncing: false,
+  dataRestoreInProgress: false,
+  restoreSyncPaused: localStorage.getItem(RESTORE_SYNC_PAUSE_KEY) === "1",
   syncPromise: null,
   initialSyncDone: false,
   online: navigator.onLine,
@@ -122,6 +127,8 @@ function getStatus() {
     email: state.user?.email || "",
     uid: state.user?.id || "",
     syncing: state.syncing,
+    restoreSyncPaused: state.restoreSyncPaused,
+    dataRestoreInProgress: state.dataRestoreInProgress,
     initialSyncDone: state.initialSyncDone,
     online: state.online,
     lastSyncAt: state.lastSyncAt,
@@ -191,6 +198,57 @@ function recordsEquivalent(storeName, a, b) {
     stableStringify(comparableRecord(storeName, b));
 }
 
+function schedulerVersionOf(record) {
+  return Math.max(0, Number(record?.schedulerVersion) || 0);
+}
+
+function stateRevisionOf(record) {
+  return Math.max(0, Number(record?.stateRevision) || 0);
+}
+
+function chooseSchedulerWinner(localRecord, remoteRecord) {
+  const localVersion = schedulerVersionOf(localRecord);
+  const remoteVersion = schedulerVersionOf(remoteRecord);
+  if (localVersion !== remoteVersion) return localVersion > remoteVersion ? localRecord : remoteRecord;
+
+  const localRevision = stateRevisionOf(localRecord);
+  const remoteRevision = stateRevisionOf(remoteRecord);
+  if (localRevision !== remoteRevision) return localRevision > remoteRevision ? localRecord : remoteRecord;
+
+  return compareTextTimestamp(normalizeTimestamp(localRecord), normalizeTimestamp(remoteRecord)) >= 0
+    ? localRecord
+    : remoteRecord;
+}
+
+function upgradeLegacyRemoteRecord(storeName, record) {
+  if (!record) return null;
+  if (schedulerVersionOf(record) >= SCHEDULER_VERSION) return sanitizeForCloud(storeName, record);
+
+  if (storeName === "wordProgress") {
+    const lastDate = record.lastReviewedDate || recordDateKey(record.lastReviewedAt || record.updatedAt);
+    // 迁移日的旧算法结果全部舍弃；旧云端记录不能把它重新同步回来。
+    if (lastDate && lastDate >= SCHEDULER_V2_RESET_DATE) return null;
+    if (typeof upgradeLegacyRecordPreservingHistory === "function") {
+      return upgradeLegacyRecordPreservingHistory(record);
+    }
+  }
+
+  if (storeName === "dailySessions") {
+    const date = String(record.date || record.remoteId || "");
+    // 不是只拒绝 10 月 1 日：所有边界日之后的旧调度会话都不能进入新版。
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= SCHEDULER_V2_RESET_DATE) return null;
+    return {
+      ...sanitizeForCloud(storeName, record),
+      date,
+      schedulerVersion: SCHEDULER_VERSION,
+      stateRevision: Math.max(1, stateRevisionOf(record)),
+      needsRegeneration: false
+    };
+  }
+
+  return sanitizeForCloud(storeName, record);
+}
+
 function wordProgressScore(record) {
   return [
     numericValue(record, "reviewCount"),
@@ -210,62 +268,20 @@ function compareScoreArrays(a, b) {
   return 0;
 }
 
+function mergeSchedulingRecords(storeName, localRecord, remoteRecord) {
+  const local = localRecord ? upgradeLegacyRemoteRecord(storeName, localRecord) : null;
+  const remote = remoteRecord ? upgradeLegacyRemoteRecord(storeName, remoteRecord) : null;
+  if (!local) return remote;
+  if (!remote) return local;
+  // 不能把旧版先“盖上 v2 标签”，再让旧版虚高的 revision 压过真正的新版。
+  const localNative = schedulerVersionOf(localRecord) >= SCHEDULER_VERSION;
+  const remoteNative = schedulerVersionOf(remoteRecord) >= SCHEDULER_VERSION;
+  if (localNative !== remoteNative) return localNative ? local : remote;
+  return sanitizeForCloud(storeName, chooseSchedulerWinner(local, remote));
+}
+
 function mergeWordProgressRecords(localRecord, remoteRecord) {
-  if (!localRecord) return remoteRecord ? sanitizeForCloud("wordProgress", remoteRecord) : null;
-  if (!remoteRecord) return sanitizeForCloud("wordProgress", localRecord);
-
-  const localScore = wordProgressScore(localRecord);
-  const remoteScore = wordProgressScore(remoteRecord);
-  let cmp = compareScoreArrays(localScore, remoteScore);
-
-  if (cmp === 0) {
-    cmp = compareTextTimestamp(normalizeTimestamp(localRecord), normalizeTimestamp(remoteRecord));
-  }
-
-  const winner = cmp >= 0 ? localRecord : remoteRecord;
-  const loser = cmp >= 0 ? remoteRecord : localRecord;
-  const merged = {
-    ...sanitizeForCloud("wordProgress", loser),
-    ...sanitizeForCloud("wordProgress", winner)
-  };
-
-  const monotonicFields = [
-    "reviewCount",
-    "knowCount",
-    "forgotCount",
-    "reinforcementCount",
-    "correctionCount",
-    "reinforcementCorrectionCount"
-  ];
-
-  for (const field of monotonicFields) {
-    merged[field] = Math.max(
-      numericValue(localRecord, field),
-      numericValue(remoteRecord, field)
-    );
-  }
-
-  // 若两台设备在相同 reviewCount 上产生不同“认识/忘了”分支，
-  // 合并后的累计次数也不能倒退；必要时把 reviewCount 提升到累计判断总数。
-  merged.reviewCount = Math.max(
-    numericValue(merged, "reviewCount"),
-    numericValue(merged, "knowCount") + numericValue(merged, "forgotCount")
-  );
-
-  // 关键状态由“学习进度更高”的记录决定，而不是由更新时间较新的低进度记录决定。
-  merged.streak = numericValue(winner, "streak");
-  merged.lastRating = winner.lastRating ?? null;
-  merged.lastReviewedAt = winner.lastReviewedAt ?? null;
-  merged.nextReviewDate = winner.nextReviewDate ?? null;
-  merged.lastReinforcementRating = winner.lastReinforcementRating ?? null;
-  merged.lastReinforcementAt = winner.lastReinforcementAt ?? null;
-  merged.lastCorrectionAt = winner.lastCorrectionAt ?? null;
-  merged.updatedAt = winner.updatedAt || normalizeTimestamp(winner) || merged.updatedAt || "";
-  merged.id = winner.id || loser.id;
-  merged.term = winner.term || loser.term || "";
-  merged.sourceOrder = winner.sourceOrder || loser.sourceOrder || 0;
-
-  return merged;
+  return mergeSchedulingRecords("wordProgress", localRecord, remoteRecord);
 }
 
 function sessionPrimaryDone(record) {
@@ -290,46 +306,7 @@ function dailySessionScore(record) {
 }
 
 function mergeDailySessionRecords(localRecord, remoteRecord) {
-  if (!localRecord) return remoteRecord ? sanitizeForCloud("dailySessions", remoteRecord) : null;
-  if (!remoteRecord) return sanitizeForCloud("dailySessions", localRecord);
-
-  const localScore = dailySessionScore(localRecord);
-  const remoteScore = dailySessionScore(remoteRecord);
-  let cmp = compareScoreArrays(localScore, remoteScore);
-
-  if (cmp === 0) {
-    cmp = compareTextTimestamp(normalizeTimestamp(localRecord), normalizeTimestamp(remoteRecord));
-  }
-
-  const winner = cmp >= 0 ? localRecord : remoteRecord;
-  const loser = cmp >= 0 ? remoteRecord : localRecord;
-  const merged = {
-    ...sanitizeForCloud("dailySessions", loser),
-    ...sanitizeForCloud("dailySessions", winner)
-  };
-
-  // 会话的队列、游标和评分必须来自同一条更高进度记录，避免“0进度新时间戳”
-  // 覆盖已经完成的学习，也避免把不同队列的游标硬拼到一起。
-  merged.primaryCompleted = sessionPrimaryDone(winner);
-  merged.cursor = numericValue(winner, "cursor");
-  merged.know = numericValue(winner, "know");
-  merged.forgot = numericValue(winner, "forgot");
-  merged.reinforcementAttempts = numericValue(winner, "reinforcementAttempts");
-  merged.queue = Array.isArray(winner.queue) ? winner.queue : [];
-  merged.initialPrimaryCount = numericValue(winner, "initialPrimaryCount");
-  merged.primaryRatings = winner.primaryRatings && typeof winner.primaryRatings === "object"
-    ? { ...winner.primaryRatings }
-    : {};
-  merged.reinsertedIds = Array.isArray(winner.reinsertedIds) ? [...winner.reinsertedIds] : [];
-  merged.planMeta = winner.planMeta && typeof winner.planMeta === "object"
-    ? { ...winner.planMeta }
-    : {};
-  merged.completedAt = winner.completedAt || null;
-  merged.updatedAt = winner.updatedAt || normalizeTimestamp(winner) || merged.updatedAt || "";
-  merged.createdAt = winner.createdAt || loser.createdAt || "";
-  merged.date = winner.date || loser.date;
-
-  return merged;
+  return mergeSchedulingRecords("dailySessions", localRecord, remoteRecord);
 }
 
 function resolveStoreRecord(storeName, localRecord, remoteRecord) {
@@ -467,7 +444,9 @@ function toRemoteRecord(row) {
 function buildRow(storeName, record, { deleted = false } = {}) {
   requireSignedIn();
 
-  const payload = sanitizeForCloud(storeName, record);
+  const payload = (storeName === "wordProgress" || storeName === "dailySessions")
+    ? upgradeLegacyRemoteRecord(storeName, record) : sanitizeForCloud(storeName, record);
+  if (!payload) throw new Error("已拦截旧调度记录上传，请更新所有设备后重试。");
   const sourceUpdatedAt = normalizeTimestamp(payload) || new Date().toISOString();
 
   return {
@@ -555,6 +534,10 @@ async function upsertRows(rows) {
 async function pushRecord(storeName, record, { checkRemote = true } = {}) {
   if (!state.signedIn || !record) return { uploaded: 0, downloaded: 0 };
 
+  if (storeName === "wordProgress" || storeName === "dailySessions") {
+    record = upgradeLegacyRemoteRecord(storeName, record);
+    if (!record) return { uploaded: 0, downloaded: 0 };
+  }
   const key = remoteDocId(storeName, record);
 
   if (!checkRemote) {
@@ -583,6 +566,7 @@ async function pushRecord(storeName, record, { checkRemote = true } = {}) {
   }
 
   const merged = resolveStoreRecord(storeName, record, remote);
+  if (!merged) return { uploaded: 0, downloaded: 0 };
 
   if (detectRollbackPrevented(storeName, record, remote, merged)) {
     state.rollbackPreventionCount++;
@@ -676,17 +660,30 @@ async function mergeStore(storeName, localItems, remoteItems) {
     }
 
     if (!remote && local) {
-      rowsToUpload.push(buildRow(storeName, local));
+      const validLocal = (storeName === "wordProgress" || storeName === "dailySessions")
+        ? upgradeLegacyRemoteRecord(storeName, local) : local;
+      if (validLocal) rowsToUpload.push(buildRow(storeName, validLocal));
       continue;
     }
 
     if (remote && !local) {
-      await window.upsertRecordFromCloud(storeName, remote);
+      const upgradedRemote = (storeName === "wordProgress" || storeName === "dailySessions")
+        ? upgradeLegacyRemoteRecord(storeName, remote)
+        : remote;
+
+      // v2.2.1 拦截边界日及之后的所有旧调度远端记录，防止云端“复活”错误进度。
+      if (!upgradedRemote) continue;
+
+      await window.upsertRecordFromCloud(storeName, upgradedRemote);
       downloaded++;
+      if (!recordsEquivalent(storeName, remote, upgradedRemote)) {
+        rowsToUpload.push(buildRow(storeName, upgradedRemote));
+      }
       continue;
     }
 
     const merged = resolveStoreRecord(storeName, local, remote);
+    if (!merged) continue; // 双方都是已舍弃的旧记录；不要写入 null/空主键。
 
     if (detectRollbackPrevented(storeName, local, remote, merged)) {
       state.rollbackPreventionCount++;
@@ -710,9 +707,15 @@ async function mergeStore(storeName, localItems, remoteItems) {
 }
 
 async function syncNow({ reason = "manual" } = {}) {
+  if (state.dataRestoreInProgress) return { skipped: true, reason: "backup-import", uploaded: 0, downloaded: 0 };
+  if (state.restoreSyncPaused && reason !== "manual") return { skipped: true, reason: "restore-paused", uploaded: 0, downloaded: 0 };
   if (!state.configured) throw new Error("Supabase 尚未配置");
   if (!state.signedIn) throw new Error("请先登录 Supabase 账号");
   if (!state.online) throw new Error("当前处于离线状态，本地复习仍可继续");
+  if (reason === "manual" && state.restoreSyncPaused) {
+    state.restoreSyncPaused = false;
+    localStorage.removeItem(RESTORE_SYNC_PAUSE_KEY);
+  }
 
   // v2.1.2：多个登录/聚焦/定时事件同时触发时，全部等待同一个同步 Promise，
   // 不再让后来的调用直接拿到 null。
@@ -802,7 +805,7 @@ async function logout() {
 }
 
 async function handleLocalChange(event) {
-  if (!state.signedIn || !state.online) return;
+  if (!state.signedIn || !state.online || state.dataRestoreInProgress || state.restoreSyncPaused) return;
   const detail = event.detail || {};
 
   try {
@@ -972,7 +975,9 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("cet6-local-change", event => {
-  handleLocalChange(event).catch(() => {});
+  const pending = handleLocalChange(event).catch(() => {});
+  activeLocalPushes.add(pending);
+  pending.finally(() => activeLocalPushes.delete(pending));
 });
 
 window.addEventListener("cet6-local-bulk-change", () => {
@@ -980,6 +985,26 @@ window.addEventListener("cet6-local-bulk-change", () => {
     syncNow({ reason: "bulk-local-change" }).catch(() => {});
   }
 });
+
+async function beginDataRestore() {
+  if (state.dataRestoreInProgress) throw new Error("正在恢复备份，请勿重复操作");
+  state.dataRestoreInProgress = true;
+  // 先阻止新同步，再等待正在运行的合并/单条上传完成。
+  await Promise.allSettled([state.syncPromise, ...activeLocalPushes].filter(Boolean));
+}
+
+function endDataRestore({ success = false } = {}) {
+  if (success) {
+    // 导入后不立即让云端更高 revision 的旧快照覆盖恢复结果。
+    // 暂停跨刷新保存，由用户核对后点“立即同步”恢复正常合并。
+    state.restoreSyncPaused = true;
+    try { localStorage.setItem(RESTORE_SYNC_PAUSE_KEY, "1"); }
+    catch (error) { console.warn("自动同步暂停标记无法持久保存，请暂时离线核对备份：", error); }
+    state.initialSyncDone = false;
+  }
+  state.dataRestoreInProgress = false;
+  emitStatus();
+}
 
 window.CET6Cloud = {
   getStatus,
@@ -989,7 +1014,9 @@ window.CET6Cloud = {
   login,
   logout,
   syncNow,
-  ensureInitialSync
+  ensureInitialSync,
+  beginDataRestore,
+  endDataRestore
 };
 
 initCloud();
