@@ -1,19 +1,19 @@
-// CET6 Review v2.2.1 — 核心程序网络优先；固定数据缓存优先。
+// CET6 Review v2.2.2 — 核心程序网络优先；固定数据缓存优先。
 // 此文件仅操作 CacheStorage，从不清除 IndexedDB 或用户学习记录。
-const SW_VERSION = "2.2.1";
-const STATIC_CACHE = "cet6-review-v2.2.1-static-1";
-const RUNTIME_CACHE = "cet6-review-v2.2.1-runtime-1";
-const CLOUD_SDK_CACHE = "cet6-review-v2.2.1-supabase-sdk";
+const SW_VERSION = "2.2.2";
+const STATIC_CACHE = "cet6-review-v2.2.2-static-1";
+const RUNTIME_CACHE = "cet6-review-v2.2.2-runtime-1";
+const CLOUD_SDK_CACHE = "cet6-review-v2.2.2-supabase-sdk";
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 const NETWORK_TIMEOUT_MS = 6000;
 const SCOPE_URL = new URL("./", self.location.href);
 
 const CORE_ASSETS = [
-  "./", "./index.html", "./style.css?v=2.2.1", "./scheduler.js?v=2.2.1",
-  "./db.js?v=2.2.1", "./dictionary.js?v=2.2.1", "./backup.js?v=2.2.1",
-  "./pwa.js?v=2.2.1", "./supabase-config.js?v=2.2.1", "./cloud-sync.js?v=2.2.1",
-  "./app.js?v=2.2.1", "./manifest.json?v=2.2.1",
-  "./data/concise-dictionary.js", "./data/concise-dictionary.json", "./data/cet6_2003.json",
+  "./", "./index.html", "./style.css?v=2.2.2", "./scheduler.js?v=2.2.2",
+  "./db.js?v=2.2.2", "./dictionary.js?v=2.2.2", "./backup.js?v=2.2.2",
+  "./pwa.js?v=2.2.2", "./supabase-config.js?v=2.2.2", "./cloud-sync.js?v=2.2.2",
+  "./app.js?v=2.2.2", "./manifest.json?v=2.2.2",
+  "./data/concise-dictionary.js?v=2.2.2", "./data/concise-dictionary.json?v=2.2.2", "./data/cet6_2003.json?v=2.2.2",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png"
 ];

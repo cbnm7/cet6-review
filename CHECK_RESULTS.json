@@ -1,299 +1,59 @@
 {
-  "appVersion": "2.2.1",
-  "checkedAt": "2026-10-01T14:26:54.304882+00:00",
-  "source": {
-    "file": "CET6-Review-v2.2.0.zip",
-    "sha256": "d39cc9f97b2b1a7311048e30fb04d16663f6cd603429fa5c4fddfb63db26a1e7"
+  "appVersion": "2.2.2",
+  "label": "音标与词头修正版",
+  "generatedAt": "2026-10-02",
+  "dataSafety": {
+    "studyDbName": "cet6-review-db",
+    "studyDbVersion": 4,
+    "unchangedCriticalFiles": {
+      "db.js": true,
+      "scheduler.js": true,
+      "cloud-sync.js": true,
+      "supabase-schema.sql": true,
+      "supabase-config.js": true,
+      "firebase-config.js": true,
+      "firestore.rules": true
+    },
+    "coreIdOrderUnchanged": true,
+    "sourceOrderUnchanged": true,
+    "serviceWorkerDeletesIndexedDB": false
   },
-  "javascriptSyntax": {
-    "tool": "v22.16.0",
-    "passed": true,
-    "files": [
-      {
-        "file": "app.js",
-        "passed": true
-      },
-      {
-        "file": "backup.js",
-        "passed": true
-      },
-      {
-        "file": "cloud-sync.js",
-        "passed": true
-      },
-      {
-        "file": "data/concise-dictionary.js",
-        "passed": true
-      },
-      {
-        "file": "db.js",
-        "passed": true
-      },
-      {
-        "file": "dictionary.js",
-        "passed": true
-      },
-      {
-        "file": "firebase-config.js",
-        "passed": true
-      },
-      {
-        "file": "pwa.js",
-        "passed": true
-      },
-      {
-        "file": "scheduler.js",
-        "passed": true
-      },
-      {
-        "file": "service-worker.js",
-        "passed": true
-      },
-      {
-        "file": "supabase-config.js",
-        "passed": true
-      }
-    ]
-  },
-  "jsonParsing": {
-    "passed": true,
-    "files": [
-      "LEXICAL_REVIEW.json",
-      "manifest.json",
-      "data/cet6_2003.json",
-      "data/concise-dictionary.json"
-    ]
-  },
-  "coreAssets": {
-    "count": 19,
-    "passed": true,
-    "assets": [
-      {
-        "url": "./",
-        "exists": true
-      },
-      {
-        "url": "./index.html",
-        "exists": true
-      },
-      {
-        "url": "./style.css?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./scheduler.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./db.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./dictionary.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./backup.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./pwa.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./supabase-config.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./cloud-sync.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./app.js?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./manifest.json?v=2.2.1",
-        "exists": true
-      },
-      {
-        "url": "./data/concise-dictionary.js",
-        "exists": true
-      },
-      {
-        "url": "./data/concise-dictionary.json",
-        "exists": true
-      },
-      {
-        "url": "./data/cet6_2003.json",
-        "exists": true
-      },
-      {
-        "url": "./icons/icon-192.png",
-        "exists": true
-      },
-      {
-        "url": "./icons/icon-512.png",
-        "exists": true
-      },
-      {
-        "url": "./icons/icon-maskable-512.png",
-        "exists": true
-      },
-      {
-        "url": "./icons/apple-touch-icon.png",
-        "exists": true
-      }
-    ]
-  },
-  "htmlPrecacheReferenceConsistency": {
-    "passed": true,
-    "refs": [
-      "manifest.json?v=2.2.1",
-      "icons/icon-192.png",
-      "icons/apple-touch-icon.png",
-      "style.css?v=2.2.1",
-      "scheduler.js?v=2.2.1",
-      "db.js?v=2.2.1",
-      "data/concise-dictionary.js",
-      "dictionary.js?v=2.2.1",
-      "backup.js?v=2.2.1",
-      "pwa.js?v=2.2.1",
-      "supabase-config.js?v=2.2.1",
-      "cloud-sync.js?v=2.2.1",
-      "app.js?v=2.2.1"
-    ]
-  },
-  "unchangedStorage": {
-    "databaseName": "cet6-review-db",
-    "databaseVersion": 4,
-    "schedulerVersion": 2
-  },
-  "preservedOriginalFiles": [
-    {
-      "file": ".nojekyll",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "unchanged_from_v2_2_0": true
+  "vocabulary": {
+    "coreRecordCount": 2003,
+    "uniqueHeadwordCount": 1992,
+    "attribute": {
+      "id": "cet6_0310",
+      "term": "attribute",
+      "sourceOrder": 310
     },
-    {
-      "file": "dictionary.js",
-      "sha256": "545a85ea11717447648647397499b15271d072835668b28550c64718363decef",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "firebase-config.js",
-      "sha256": "84d968c6b6a9bdde5d678c3846089a6612400511f3d1729e0580ab7b106d3055",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "firestore.rules",
-      "sha256": "decedcd7419d6031367a124d0efd79f26dd2761694dc4daa6d4fbd8ae9de9714",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "supabase-config.js",
-      "sha256": "f2c2021e53b6da3283cdbcb72b37227d9d88d87d0172278aa2eb40a1e4c31c23",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "supabase-schema.sql",
-      "sha256": "308e964c5c59725cf36f754e06672161cd66c3b6868fe12220f411388c4ee4a5",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "manifest.json",
-      "sha256": "6d4cb4e08a37365092e91bcd738369276a88338f8bf536bb5d1e4d6413923999",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "data/cet6_2003.json",
-      "sha256": "8473e1ac1ce1632578ac1e0faa7143c36ff629ebad87adbf971b99e661b5e827",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "data/concise-dictionary.js",
-      "sha256": "81221dce9249df22f477c195bb38d65632936ff699279ad02ac47414e8d82729",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "data/concise-dictionary.json",
-      "sha256": "80c3f1613c1a133fd255fba8e2268d5b4c95938c5744fe48894408d97ab783af",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "icons/apple-touch-icon.png",
-      "sha256": "bb73dda28a9fee73b642a3449fabbea143429c19b96a536fb4d626b4b75fa2f9",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "icons/icon-192.png",
-      "sha256": "6233ef02d74688c873e781bc29c02a9792f71ff788736f6b424172d09a170ae6",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "icons/icon-512.png",
-      "sha256": "96645ee075eb0e1d449b7fb9f29ccf0e97d9446485e0621947000c76b8ad814c",
-      "unchanged_from_v2_2_0": true
-    },
-    {
-      "file": "icons/icon-maskable-512.png",
-      "sha256": "fd57ff65c0572010cbc969acfc8a6e932db452eeb8e69bdfeb0d3563782621bd",
-      "unchanged_from_v2_2_0": true
+    "mirror": {
+      "id": "cet6_0367",
+      "term": "mirror",
+      "sourceOrder": 367
     }
-  ],
-  "vocabularyCount": 2003,
-  "regressionTests": {
-    "passed": 40,
-    "failed": 0,
-    "raw": "tests/REGRESSION_RESULTS.tap",
-    "environment": "Node VM with in-memory database/network/cache test doubles"
   },
-  "uiChecks": {
-    "passed": 13,
-    "failed": 0,
-    "raw": "tests/UI_v2.2.1_RESULTS.json",
-    "environment": "Chromium about:blank, injected actual app/CSS; in-memory IndexedDB + fetch/localStorage doubles; no live Supabase or Service Worker"
-  },
-  "changedOriginalFiles": [
-    "DEPLOY.md",
-    "README.md",
-    "TEST_REPORT.md",
-    "V2.2.0_MIGRATION_NOTES.md",
-    "app.js",
-    "backup.js",
-    "cloud-sync.js",
-    "db.js",
-    "index.html",
-    "pwa.js",
-    "scheduler.js",
-    "service-worker.js",
-    "style.css"
-  ],
-  "archivedHistoricalReports": [
-    {
-      "original": "CHECK_RESULTS.json",
-      "archived_as": "docs/history/v2.1.3/CHECK_RESULTS.json"
-    },
-    {
-      "original": "SW_TEST_RESULTS.json",
-      "archived_as": "docs/history/v2.1.3/SW_TEST_RESULTS.json"
-    },
-    {
-      "original": "UI_TEST_RESULTS.json",
-      "archived_as": "docs/history/v2.1.3/UI_TEST_RESULTS.json"
-    },
-    {
-      "original": "TEST_REPORT.md",
-      "archived_as": "docs/history/v2.1.3/TEST_REPORT.md"
-    },
-    {
-      "original": "scheduler.js.bak",
-      "archived_as": "docs/history/v2.1.3/scheduler.js.bak"
+  "phonetics": {
+    "dictionaryHeadwordCount": 1992,
+    "ipaCoverageCount": 1992,
+    "accent": "North American English",
+    "system": "IPA (broad transcription)",
+    "source": "CMU Pronouncing Dictionary / ARPAbet to IPA conversion",
+    "sample": {
+      "individual": "ˌɪndəˈvɪdʒəwəl",
+      "reasonable": "ˈrizənəbəl",
+      "attribute": "ˈætrəbˌjut",
+      "mirror": "ˈmɪrɚ"
     }
-  ],
-  "limitations": [
-    "No user browser study data was provided or accessed.",
-    "No live Supabase, GitHub Pages deployment, real browser IndexedDB disk persistence, or real Service Worker lifecycle end-to-end verification.",
-    "Client filtering does not prevent a still-running old device from writing to the server; all devices should update."
-  ]
+  },
+  "tests": {
+    "node": {
+      "passed": 44,
+      "failed": 0
+    },
+    "chromiumUi": {
+      "passed": 13,
+      "errors": []
+    },
+    "productionJsSyntax": "passed"
+  }
 }

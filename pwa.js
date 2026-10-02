@@ -1,5 +1,5 @@
-// CET6 Review v2.2.1 — 更新提示，不在正在作答/导入时强制刷新。
-const PWA_APP_VERSION = "2.2.1";
+// CET6 Review v2.2.2 — 更新提示，不在正在作答/导入时强制刷新。
+const PWA_APP_VERSION = "2.2.2";
 let deferredInstallPrompt = null;
 let serviceWorkerRegistration = null;
 let availableAppVersion = null;

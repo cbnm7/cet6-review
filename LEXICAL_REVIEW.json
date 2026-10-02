@@ -6064,14 +6064,18 @@
     },
     {
       "order": 310,
-      "term": "a tribute",
+      "term": "attribute",
       "coreIds": [
         "cet6_0310"
       ],
       "translations": [
         {
-          "type": "phr. n.",
-          "translation": "致敬；体现……价值的事物"
+          "type": "n.",
+          "translation": "属性；特征"
+        },
+        {
+          "type": "v.",
+          "translation": "把……归因于；认为……是由于"
         }
       ],
       "needsReview": false,
@@ -7140,13 +7144,22 @@
     },
     {
       "order": 366,
-      "term": "mir",
+      "term": "mirror",
       "coreIds": [
         "cet6_0367"
       ],
-      "translations": [],
-      "needsReview": true,
-      "note": "源词头含义不明确；不按普通考试词强行释义",
+      "translations": [
+        {
+          "type": "n.",
+          "translation": "镜子；反映"
+        },
+        {
+          "type": "v.",
+          "translation": "反映；映照"
+        }
+      ],
+      "needsReview": false,
+      "note": "",
       "commonCorpusTag": null,
       "externalDictionaryChecked": false,
       "references": []

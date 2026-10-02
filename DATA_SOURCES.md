@@ -1,34 +1,36 @@
-# v2.1.3 数据来源与核查方式
+# v2.2.2 数据来源与核查方式
 
-## 本次真正使用的数据
+## 核心词表
 
-1. **用户上传的主词表** `data/cet6_2003.json`：2003 条记录，1992 个唯一词头。原文件不改。
-2. **本次逐词编辑的释义**：`data/concise-dictionary.json`；语义取舍和中文简明表述由模型逐条编辑。不是取得了一套官方“六级/考研所有应考义项”的授权词库。
-3. **本地辅助词性词表**：TextBlob 包内 `en/en-lexicon.txt`（Brill tagger / Brown、Penn Treebank 常见标签及扩充数据）。用于发现值得复查的 POS 提示，不充当完整多词性词典，不将其整库打包。
-4. **定点查询的词典原站**：仅下表所列词头完成此轮外部查询。中文释义为重新概括，没有复制长段词典定义或例句。
+- `data/cet6_2003.json`：2003 条核心记录、1992 个唯一词头/短语。
+- 本版保持全部稳定 ID 与 `source_order` 不变。
+- 用户确认的两处词头修正：
+  - `cet6_0310` → `attribute`
+  - `cet6_0367` → `mirror`
 
-| 核查目标 | 原站 |
-|---|---|
-| principal | https://www.merriam-webster.com/dictionary/principal |
-| underly / underlying 对照 underlie | https://www.merriam-webster.com/dictionary/underlie |
-| content | https://www.merriam-webster.com/dictionary/content |
-| provided | https://www.merriam-webster.com/dictionary/provided |
-| given | https://www.merriam-webster.com/dictionary/given |
-| rival | https://www.merriam-webster.com/dictionary/rival |
-| retail | https://www.merriam-webster.com/dictionary/retail |
-| retail 对照不同词典的修饰语分类 | https://www.oxfordlearnersdictionaries.com/definition/english/retail_1 |
+## 中文精简释义
 
-查询/整理日期：2026-09-30。
+中文释义继续使用 v2.1.3 / v2.2.1 已整理的本地精简词典。本版只针对 `attribute`、`mirror` 补齐与修正对应精简释义，不重新批量改写其它中文释义。
 
-## 与旧版区别
+## 音标来源
 
-旧版从 KyleBing/english-vocabulary 的九套 TSV 拉取数据，随后合并相同词头的词性、释义、搭配与例句。本版运行时不再请求或合并这些远端词典。
+本版为 1992 个唯一词头/短语统一加入北美英语 IPA。
 
-ECDICT、WordNet 的项目说明曾用于前期评估，但本轮没有取得并逐词查询它们的完整数据，因此它们不列为这份释义逐词核查的证据。
+- 发音基础：**CMU Pronouncing Dictionary (CMUdict)**。
+- CMUdict 是 Carnegie Mellon University Speech Group 维护的英语发音词典，面向 North American / US English，并使用 ARPAbet 表示发音。
+- 本项目将主发音的 ARPAbet 转换为广义 IPA。
+- 多词短语按组成词逐项转换后组合。
+- 当前 1992 / 1992 唯一词头/短语均有 `us` 字段。
+- 唯一未直接由 CMUdict 单词查表覆盖的 `4th` 使用人工标准化 `/fɔrθ/`。
 
-## 保留与限制
+官方来源：
 
-- 旧词典缓存中已有的音标可延续显示，本轮没有重新审校每个音标。不会把旧中文释义重新混入。
-- 已有阅读生词中的中文义、原句和备注是用户内容，未被模型批量覆盖。
-- 缺少可靠来源的词头会提示待核对，不因为“覆盖率”指标而硬配释义。
-- 词性可随上下文变化；本版兼列的是有用常见词性，不是所有历史或专门领域用法的清单。
+- https://github.com/cmusphinx/cmudict
+- https://github.com/words/cmu-pronouncing-dictionary
+
+## 限制
+
+- “统一 IPA”指本项目采用同一北美英语口径的学习用广义音标，不表示穷举所有英式、美式地域变体、词性变读或弱读。
+- CMUdict 自身说明其中仍可能存在错误、遗漏和不一致，因此特殊词若后续发现问题，应做定点人工校正，而不是改动学习记录 ID。
+- 本版不把美式音标复制到 `uk` 字段；没有可靠英式来源时宁可留空，避免把同一发音伪装成英式音标。
+- 阅读生词中的用户中文义、原句和备注没有被批量覆盖。

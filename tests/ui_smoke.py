@@ -30,10 +30,13 @@ with sync_playwright() as p:
         page.add_script_tag(content=(ROOT/file).read_text())
     page.wait_for_function('vocabulary.length===2003 && lastDictionaryCoverage?.reviewed===1992',timeout=25000)
     assert not page.evaluate('window.__alerts'),page.evaluate('window.__alerts')
-    ok('首页初始化2003词，原词典1992词头就绪')
+    
+    ipa=page.evaluate("async()=>({attribute:(await getDictionaryEntry('attribute')).us,mirror:(await getDictionaryEntry('mirror')).us})")
+    assert ipa['attribute']=='ˈætrəbˌjut' and ipa['mirror']=='ˈmɪrɚ',ipa
+    ok('首页初始化2003词，1992词头词典与IPA就绪')
     page.locator('#settingsBtn').click()
     page.wait_for_selector('#exportPreImportBackupBtn')
-    assert '2.2.1 数据保护与渐进加练版' in page.locator('.dictionary-source-card').inner_text()
+    assert '2.2.2 音标与词头修正版' in page.locator('.dictionary-source-card').inner_text()
     assert page.locator('#checkAppUpdateBtn').count()==1
     ok('设置页新版号、检查更新、导入前快照按钮')
     page.locator('#exportPreImportBackupBtn').click()
@@ -72,7 +75,7 @@ with sync_playwright() as p:
     backup=page.evaluate('async()=>await buildStudyBackup()')
     assert backup['schemaVersion']==2 and backup['scheduler']['migration']['version']==2
     ok('页面导出备份包含调度与迁移版本')
-    page.evaluate('showAppUpdateNotice("2.2.2")')
+    page.evaluate('showAppUpdateNotice("2.2.3")')
     page.wait_for_selector('#appUpdateNotice')
     page.evaluate('isSaving=true');page.locator('#appUpdateNotice button').click()
     assert '正在保存' in page.locator('#appUpdateNotice').inner_text()
@@ -84,11 +87,11 @@ with sync_playwright() as p:
         dims=page.evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})')
         assert dims['scroll']<=dims['width'],dims
         ok(f'{width}px设置页无横向溢出',dims)
-    page.screenshot(path=str(ROOT/'tests/UI_v2.2.1_settings.png'),full_page=True)
+    page.screenshot(path=str(ROOT/'tests/UI_v2.2.2_settings.png'),full_page=True)
     assert not report['errors'],report['errors']
     assert not page.evaluate('window.__alerts'),page.evaluate('window.__alerts')
     ok('UI过程中无未处理脚本异常或保存失败提示')
     browser.close()
 report['passed']=len(report['checks'])
-(ROOT/'tests/UI_v2.2.1_RESULTS.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+(ROOT/'tests/UI_v2.2.2_RESULTS.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
 print(json.dumps(report,ensure_ascii=False,indent=2))

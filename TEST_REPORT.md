@@ -1,62 +1,76 @@
-# v2.2.1 实际测试报告
+# v2.2.2 实际测试报告
 
-## 本次执行
+测试日期：2026-10-02
 
-**Node.js v22.16.0：40 项自动化测试全部通过，0 失败。**
+## 自动化回归
 
-| 范围 | 数量 | 覆盖点 |
-| --- | ---: | --- |
-| 备份与迁移 | 10 | v2.2.0 schema1 恢复、v2.2.1 往返、重复导入、旧备份、混合备份、缺迁移标记、导入前快照、损坏文件拒绝、事务失败回滚、等待在途同步 |
-| 云同步合并 | 8 | 10 月 1 日及以后旧会话拒绝、历史保留、新版保留、真正新版优先、远端独有/本地独有/双方皆旧、上传路径保护 |
-| 调度与加练 | 9 | 160 认识+40 遗忘、237 到期溢出、恰好 200、轮次切换、10/25/50/队尾、旧队列兼容、短队列、跨天阶梯、加练不推进跨天阶段 |
-| Service Worker | 12 | 网络优先、最新缓存优先、404/500、超时、固定数据缓存优先、导航回退、缓存写失败、安装资产、安装失败、激活清理、API 不缓存、其它文件不污染首页 |
-| PWA 版本比较 | 1 | 不把较低版本 Worker 误报为新版本 |
+在项目目录执行：
 
-原始输出：`tests/REGRESSION_RESULTS.tap`。
-
-**Chromium 页面检查：13 项通过，未观察到未处理脚本异常。**
-
-实际注入本工程页面、CSS 和运行脚本，验证首页与词典初始化、设置页版本与新按钮、忘记后插回、认识→记错了、加练纠错递增、重新读取会话、备份版本元信息、保存期间不强制刷新，以及 360 / 390 / 480 像素视口无横向溢出。
-
-结果：`tests/UI_v2.2.1_RESULTS.json`；截图：`tests/UI_v2.2.1_settings.png`。
-
-全部生产 JavaScript 通过 `node --check`。核心资源清单 19 项文件均存在，HTML 引用与预缓存版本一致。原始词表、词典、配置和图标的字节一致性校验记录在 `CHECK_RESULTS.json`。
-
-## 环境与限制：不能把模拟测试说成真实设备验收
-
-本环境 Chromium 对 `http://127.0.0.1:8765/` 的导航返回 `ERR_BLOCKED_BY_ADMINISTRATOR`。因此页面测试采用 `about:blank` 注入实际页面代码，而不是正常网站导航。
-
-- IndexedDB：使用 `tests/support/memory-idb.cjs` 的有限异步内存替身；模拟提交、回滚和错误注入，**不是浏览器磁盘 IndexedDB 的完整实现或兼容性认证**。
-- Service Worker：在 Node VM 中执行本工程 Worker，使用 Request/Response 与内存 CacheStorage/fetch 替身；**没有验证真实注册、生命周期、GitHub CDN、Chrome 手机缓存或断网行为**。
-- 页面：真实 Chromium DOM/CSS/按钮执行；词库 fetch、本地存储与 IndexedDB 使用测试替身，Supabase 未配置。截图中的未配置状态仅属于测试环境，不代表交付工程配置被删除。
-- 云同步：执行实际过滤、合并、上传选择函数，远端 API 用测试桩；**没有登录用户账号，没有读写真实云端，也没有完成多设备并发端到端验收**。
-- 测试词记录为构造数据，不是用户真实学习记录。本次不宣称已证明用户第一天每个词的真实状态都已恢复。
-
-测试替身不出现在 `index.html` 或 Worker 预缓存清单中，不会被生产 App 加载。
-
-## 复跑
-
-在工程目录：
-
-```sh
+```bash
 node --test tests/*.test.cjs
 ```
 
-不需要 npm 安装。页面检查另需 Python Playwright 和 Chromium：
+结果：**44 / 44 通过，0 失败**。
 
-```sh
-python tests/ui_smoke.py
-```
+覆盖范围包括：
 
-可用 `CHROMIUM_PATH` 指定浏览器可执行文件。普通使用 App 无需这些开发工具。
+- 分轮调度、200 词配额、到期复习词超过 200 的情况。
+- 跨天 `1 → 3 → 7 → 14 → 30` 调度与当天递增加练。
+- v2.2.0 / v2.2.1 备份、迁移、导入前快照、事务回滚。
+- 旧调度器 2026-10-01 及以后会话过滤。
+- Service Worker 网络优先/缓存回退、版本更新检查。
+- **2003 条核心词条稳定 ID/顺序不变。**
+- `attribute`、`mirror` 在原稳定 ID 上完成词头修正。
+- **1992 / 1992 唯一词头/短语具有北美英语 IPA。**
+- 学习数据库 `cet6-review-db` 的数据库名、版本和 `wordProgress` 主键保持不变。
 
-## 实现参考
+完整输出：`tests/REGRESSION_RESULTS.tap`。
 
-核心网络优先/离线回退按 Chrome 官方缓存策略文档设计；更新提示参考官方 Service Worker 生命周期和更新处理说明；导入以事务完成/中止作为成功/失败边界。
+## JavaScript 语法检查
 
-- Chrome for Developers — Strategies for service worker caching：`https://developer.chrome.com/docs/workbox/caching-strategies-overview`
-- web.dev — The service worker lifecycle：`https://web.dev/articles/service-worker-lifecycle`
-- Chrome for Developers — Handling service worker updates with immediacy：`https://developer.chrome.com/docs/workbox/handling-service-worker-updates`
-- MDN — IDBTransaction / abort：`https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction`；`https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/abort`
+对生产运行 JS 执行 `node --check`：
 
-以上文档用于实现依据，不等于本项目已完成其覆盖的所有浏览器验证。
+- `app.js`
+- `backup.js`
+- `cloud-sync.js`
+- `db.js`
+- `dictionary.js`
+- `firebase-config.js`
+- `pwa.js`
+- `scheduler.js`
+- `service-worker.js`
+- `supabase-config.js`
+
+结果：全部通过。
+
+## Chromium 页面检查
+
+`tests/ui_smoke.py` 实际执行 **13 项**页面级检查，全部通过，包括：
+
+- 2003 条词表、1992 个词典词头和 IPA 数据加载。
+- 设置页显示 v2.2.2。
+- 当天 10 → 25 项加练与刷新后的层级续接。
+- 备份导出包含调度/迁移版本。
+- 新版本提示不会在保存过程中强制刷新。
+- 360 / 390 / 480 px 宽度无设置页横向溢出。
+- 无未处理脚本异常或保存失败提示。
+
+结果：`tests/UI_v2.2.2_RESULTS.json`；截图：`tests/UI_v2.2.2_settings.png`。
+
+## 数据保护定向核对
+
+与用户上传的 v2.2.1 工程逐文件比较：
+
+- `db.js`：字节一致。
+- `scheduler.js`：字节一致。
+- `cloud-sync.js`：字节一致。
+- `supabase-schema.sql`：字节一致。
+- `supabase-config.js`：字节一致。
+- `firebase-config.js`、`firestore.rules`：字节一致。
+- `backup.js` 仅更新交付版本号/注释，不改变导入导出逻辑。
+
+词表还额外比较了 2003 条记录的 ID 序列与 `source_order` 序列，均与上传版完全一致。
+
+## 未覆盖的部分
+
+测试环境没有连接用户真实 Supabase 账号，也没有在用户真实手机浏览器数据库上执行破坏性升级测试。因此仍建议发布前导出一份独立 JSON 备份。正常原地更新本身不需要导入备份或清除数据。

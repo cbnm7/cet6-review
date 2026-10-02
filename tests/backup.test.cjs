@@ -12,10 +12,10 @@ test('v2.2.0 schema1备份导入：10月1日/15日/20日新版真实记录逐字
  assert.equal(await h.context.migrateSchedulerV2IfNeeded(),false);
  assert.deepEqual(stableStores((await h.context.buildStudyBackup()).stores),stableStores(b.stores));
 });
-test('v2.2.1备份往返和重复导入不清正常进度；包含迁移标记',async()=>{
+test('v2.2.2备份往返和重复导入不清正常进度；包含迁移标记',async()=>{
  const h=await initialized();const b=backup({wordProgress:[modernWord(1)],dailySessions:[session('2026-10-20')]});
  await h.context.importStudyBackupFile(file(b));const exported=await h.context.buildStudyBackup();
- assert.equal(exported.schemaVersion,2);assert.equal(exported.appVersion,'2.2.1');assert.equal(exported.scheduler.version,2);assert.equal(exported.scheduler.migration.version,2);
+ assert.equal(exported.schemaVersion,2);assert.equal(exported.appVersion,'2.2.2');assert.equal(exported.scheduler.version,2);assert.equal(exported.scheduler.migration.version,2);
  for(let i=0;i<3;i++){
   await h.context.importStudyBackupFile(file(exported));
   assert.deepEqual(stableStores((await h.context.buildStudyBackup()).stores),stableStores(b.stores));

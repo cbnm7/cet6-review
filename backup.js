@@ -1,4 +1,4 @@
-// CET6 Review v2.2.1 — 向后兼容、事务式学习数据备份与恢复。
+// CET6 Review v2.2.2 — 向后兼容、事务式学习数据备份与恢复。
 const BACKUP_FORMAT = "cet6-review-backup";
 const BACKUP_SCHEMA_VERSION = 2;
 const PRE_IMPORT_BACKUP_KEY = "study-backup-before-import";
@@ -37,7 +37,7 @@ async function buildStudyBackup() {
   return {
     format: BACKUP_FORMAT,
     schemaVersion: BACKUP_SCHEMA_VERSION,
-    appVersion: "2.2.1",
+    appVersion: "2.2.2",
     scheduler: { version: SCHEDULER_VERSION, migration },
     exportedAt: new Date().toISOString(),
     note: "包含学习数据与调度迁移标记，不含账号凭据和词典缓存。恢复不会重新执行已完成的旧日期迁移；云同步仍按合并规则处理。",

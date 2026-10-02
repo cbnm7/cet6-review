@@ -1,11 +1,11 @@
-// CET6 Review v2.1.3 — 本地精简词典
+// CET6 Review v2.2.2 — 本地精简词典 + 北美英语 IPA
 // 只读取随工程打包的词性/中文释义。旧在线词典不再参与合并。
 // 只更新 cet6-dictionary-db；不会修改学习数据库或 Supabase。
 const DICT_DB_NAME = "cet6-dictionary-db";
 const DICT_DB_VERSION = 3; // 保持原数据库版本，使用数据版本作非破坏性迁移
 const DICT_ENTRY_STORE = "entries";
 const DICT_META_STORE = "meta";
-const DICTIONARY_QUALITY_VERSION = "2.1.3-concise-1";
+const DICTIONARY_QUALITY_VERSION = "2.2.2-concise-ipa-1";
 let dictionaryDB = null;
 let localDictionaryMap = null;
 let dictionarySeedTask = null;
@@ -40,8 +40,9 @@ function getBundledDictionaryMap() {
       term: row.term, key, normalizedTerm: key, translations,
       needsReview: Boolean(row.needsReview), note: String(row.note || ""),
       qualityVersion: DICTIONARY_QUALITY_VERSION,
-      sources: ["本地精简词典 · v2.1.3"],
-      us: "", uk: ""
+      sources: ["本地精简词典 · v2.2.2"],
+      us: String(row.us || ""), uk: String(row.uk || ""),
+      phoneticSource: String(row.phoneticSource || "")
     });
   }
   if (map.size !== bundle.headwordCount) throw new Error("精简词典数量校验失败。");
@@ -122,12 +123,13 @@ async function syncDictionaryForVocabulary(vocabulary, options = {}) {
     const map = getBundledDictionaryMap();
     options.onProgress?.({ stage: "loading", source: "本地精简词典" });
     const oldRows = await dictionaryRead(DICT_ENTRY_STORE);
-    // 本次不审音标：仅延续旧缓存的音标，不从旧缓存读取任何释义、搭配或例句。
+    // v2.2.2 已随包内置标准 IPA：包内音标优先；只在当前包缺失某口音时才延续旧缓存，
+    // 防止旧版空字符串反向覆盖新音标。绝不从旧缓存读取释义、搭配或例句。
     for (const old of oldRows || []) {
       const current = map.get(normalizeDictionaryTerm(old.normalizedTerm || old.key || old.term));
       if (!current) continue;
       for (const label of ["us", "uk"]) {
-        if (typeof old[label] === "string" && old[label].length <= 160) current[label] = old[label];
+        if (!current[label] && typeof old[label] === "string" && old[label].length <= 160) current[label] = old[label];
       }
     }
     const oldMeta = await getDictionaryMeta("sync");

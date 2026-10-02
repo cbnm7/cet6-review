@@ -1,11 +1,11 @@
 // =======================================
 // CET6 Review - app.js
-// v2.2.1 分轮学习 + 遗忘词间隔复习（保留 Supabase 多设备同步）
+// v2.2.2 分轮学习 + 遗忘词间隔复习（保留 Supabase 多设备同步）
 // 每日队列 + IndexedDB + 二档复习 + 阅读生词
 // + 今日复习总览（三分类） + 重点易错 + 每日复习记录
 // =======================================
 
-const APP_VERSION = "2.2.1 数据保护与渐进加练版";
+const APP_VERSION = "2.2.2 音标与词头修正版";
 
 const app = document.querySelector(".app");
 const homePageHTML = app.innerHTML;
@@ -22,7 +22,7 @@ let lastDictionaryCoverage = null;
 let difficultPractice = null;
 
 async function loadVocabulary() {
-  const response = await fetch("./data/cet6_2003.json");
+  const response = await fetch("./data/cet6_2003.json?v=2.2.2");
 
   if (!response.ok) {
     throw new Error(`词库加载失败：HTTP ${response.status}`);
@@ -1379,7 +1379,7 @@ function renderDictionaryCard(entry, fallbackTerm = "") {
         <div class="dictionary-section-title">词性与精简释义</div>
         <div class="translation-list">${renderConciseTranslationRows(entry, fallbackTerm)}</div>
       </div>
-      <div class="dictionary-source-note">本地精简词典 · 常用义优先 · v2.1.3</div>
+      <div class="dictionary-source-note">本地精简词典 · 常用义优先 · 北美英语 IPA · v2.2.2</div>
     </section>
   `;
 }
@@ -1435,10 +1435,10 @@ async function showSettingsPage() {
         ${coverage.matched} 个词头有精简释义，${coverage.flagged} 个疑似异常词头单独提示。相同词性的释义合并展示，不设固定条数；保留六级和考研阅读常用义，不把词典全部冷僻用法塞进来。
       </p>
       <p class="settings-help">
-        词性和释义随 App 完整内置，无须再同步远端词典。额外搭配和例句已移除；原词表中的词组词头仍可正常复习。
+        词性、释义和北美英语 IPA 随 App 完整内置，无须再同步远端词典。1992 / 1992 个唯一词头与短语均已有音标；额外搭配和例句已移除。
       </p>
       <p class="settings-meta">
-        词典版本：v2.1.3 · ${meta?.lastSyncAt ? `本地更新：${formatDateTime(meta.lastSyncAt)}` : "本地词典就绪"}
+        词典版本：v2.2.2 · IPA：CMUdict 北美英语 · ${meta?.lastSyncAt ? `本地更新：${formatDateTime(meta.lastSyncAt)}` : "本地词典就绪"}
       </p>
       <button class="primary-button" id="syncDictionaryBtn">重新载入本地词典</button>
       <div id="dictionarySyncMessage" class="sync-message"></div>
@@ -1872,7 +1872,7 @@ async function initApp() {
     // 不再后台抓取或合并第三方词典，防止重新混入重复/错配义项。
     lastDictionaryCoverage = await getDictionaryCoverage(vocabulary);
 
-    console.log("CET6 Review v2.2.1 初始化完成");
+    console.log("CET6 Review v2.2.2 初始化完成");
   } catch (error) {
     console.error("App 初始化失败：", error);
     alert("App 初始化失败，请打开浏览器开发者工具查看错误。");
