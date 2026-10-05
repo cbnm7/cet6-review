@@ -1,33 +1,18 @@
 {
-  "name": "CET6 Review 六级单词复习",
-  "short_name": "CET6 Review",
-  "description": "离线优先的六级核心词复习工具，支持 Supabase 多设备同步、遗忘优先、易错词、阅读生词和本地备份。",
+  "name": "阅读生词",
+  "short_name": "阅读生词",
+  "description": "只用于保存阅读中遇到的英语生词、短语和原句。",
   "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#f6f7f9",
-  "theme_color": "#1f2329",
+  "background_color": "#f4f5f7",
+  "theme_color": "#111827",
   "lang": "zh-CN",
   "icons": [
-    {
-      "src": "./icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

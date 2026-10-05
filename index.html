@@ -1,103 +1,75 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#1f2329">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="CET6 Review">
-  <title>CET6 Review</title>
-  <link rel="manifest" href="manifest.json?v=2.2.2">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=2.2.2">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="只用于保存阅读中遇到的英语生词和短语。">
+  <title>阅读生词</title>
+  <link rel="manifest" href="./manifest.json?v=3.0.0">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./style.css?v=3.0.0">
 </head>
 <body>
-  <main class="app">
-    <header class="topbar">
+  <main class="app-shell">
+    <header class="page-header">
       <div>
-        <p class="date">CET-6 REVIEW</p>
-        <h1>六级单词复习</h1>
+        <p class="eyebrow">Reading Vocabulary</p>
+        <h1>阅读生词</h1>
+        <p class="subtitle">只记录阅读中真正遇到的单词、短语和原句。</p>
       </div>
-      <button class="settings-button" id="settingsBtn" aria-label="设置">⚙</button>
+      <div class="count-card" aria-label="已保存词条数">
+        <strong id="wordCount">0</strong>
+        <span>已保存</span>
+      </div>
     </header>
 
-    <section class="today-card">
-      <div class="today-header">
-        <div>
-          <p class="section-label">今日复习</p>
-          <h2>0 / 200</h2>
-        </div>
-        <div class="progress-text">0%</div>
+    <section class="card form-card" aria-labelledby="saveTitle">
+      <div class="section-heading">
+        <h2 id="saveTitle">保存生词</h2>
+        <span>同一词条再次保存会更新内容并累计遇见次数</span>
       </div>
 
-      <div class="progress-bar">
-        <div class="progress-value"></div>
-      </div>
+      <form id="wordForm" class="word-form" autocomplete="off">
+        <label>
+          <span>单词 / 短语 <b>*</b></span>
+          <input id="term" name="term" type="text" placeholder="例如 susceptible to" required autofocus>
+        </label>
 
-      <button class="primary-button" id="startReviewBtn">开始今日复习</button>
+        <label>
+          <span>中文义</span>
+          <input id="meaning" name="meaning" type="text" placeholder="例如 易受……影响">
+        </label>
+
+        <label>
+          <span>来源</span>
+          <input id="source" name="source" type="text" placeholder="例如 六级阅读 Passage Two">
+        </label>
+
+        <label>
+          <span>原句</span>
+          <textarea id="sentence" name="sentence" rows="3" placeholder="把阅读中的原句粘贴到这里"></textarea>
+        </label>
+
+        <label>
+          <span>备注</span>
+          <textarea id="note" name="note" rows="2" placeholder="可选：搭配、易混点等"></textarea>
+        </label>
+
+        <button id="saveButton" class="primary-button" type="submit">保存</button>
+        <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
+      </form>
     </section>
 
-    <section class="menu">
-      <button class="menu-card" id="todayOverviewBtn" type="button">
-        <div>
-          <h3>今日复习总览</h3>
-          <p>查看今天计划、已完成和待复习的全部单词</p>
-        </div>
-        <span>›</span>
-      </button>
-
-      <button class="menu-card" id="difficultWordsBtn" type="button">
-        <div>
-          <h3>重点易错</h3>
-          <p>查看当前忘词与反复遗忘的高风险单词</p>
-        </div>
-        <span>›</span>
-      </button>
-
-      <button class="menu-card" id="readingWordsBtn" type="button">
-        <div>
-          <h3>阅读生词</h3>
-          <p>保存阅读中遇到的单词、短语和原句</p>
-        </div>
-        <span>›</span>
-      </button>
-
-      <button class="menu-card" id="dailyHistoryBtn" type="button">
-        <div>
-          <h3>每日复习记录</h3>
-          <p>保存并查看每天实际完成的复习词数</p>
-        </div>
-        <span>›</span>
-      </button>
-    </section>
-
-    <section class="stats">
-      <div>
-        <strong>0</strong>
-        <span>今日已复习</span>
+    <section class="saved-section" aria-labelledby="savedTitle">
+      <div class="section-heading list-heading">
+        <h2 id="savedTitle">已保存生词</h2>
       </div>
-      <div>
-        <strong>0</strong>
-        <span>忘记词</span>
-      </div>
-      <div>
-        <strong>0</strong>
-        <span>阅读生词</span>
-      </div>
+      <div id="wordList" class="word-list"></div>
     </section>
   </main>
 
-  <script src="scheduler.js?v=2.2.2"></script>
-  <script src="db.js?v=2.2.2"></script>
-  <script src="data/concise-dictionary.js?v=2.2.2"></script>
-  <script src="dictionary.js?v=2.2.2"></script>
-  <script src="backup.js?v=2.2.2"></script>
-  <script src="pwa.js?v=2.2.2"></script>
-  <script src="supabase-config.js?v=2.2.2"></script>
-  <script src="cloud-sync.js?v=2.2.2"></script>
-  <script src="app.js?v=2.2.2"></script>
+  <script src="./db.js?v=3.0.0"></script>
+  <script src="./app.js?v=3.0.0"></script>
 </body>
 </html>
