@@ -1,0 +1,436 @@
+TAP version 13
+# Subtest: upgrade: same database/version and no data reset
+ok 1 - upgrade: same database/version and no data reset
+  ---
+  duration_ms: 27.567971
+  type: 'test'
+  ...
+# Subtest: edit keeps local ID creation time count and total count
+ok 2 - edit keeps local ID creation time count and total count
+  ---
+  duration_ms: 7.483064
+  type: 'test'
+  ...
+# Subtest: all five fields editable, optional fields can be blank
+ok 3 - all five fields editable, optional fields can be blank
+  ---
+  duration_ms: 3.725454
+  type: 'test'
+  ...
+# Subtest: normal save retains encounter behavior and edit does not
+ok 4 - normal save retains encounter behavior and edit does not
+  ---
+  duration_ms: 3.002571
+  type: 'test'
+  ...
+# Subtest: rename writes old-key tombstone and new key atomically
+ok 5 - rename writes old-key tombstone and new key atomically
+  ---
+  duration_ms: 3.206549
+  type: 'test'
+  ...
+# Subtest: rename collision fails with both words intact
+ok 6 - rename collision fails with both words intact
+  ---
+  duration_ms: 17.259139
+  type: 'test'
+  ...
+# Subtest: case-only edit does not create deletion tombstone
+ok 7 - case-only edit does not create deletion tombstone
+  ---
+  duration_ms: 3.925845
+  type: 'test'
+  ...
+# Subtest: transaction failure rolls back rename and tombstone
+ok 8 - transaction failure rolls back rename and tombstone
+  ---
+  duration_ms: 3.747482
+  type: 'test'
+  ...
+# Subtest: editing a deleted entry fails rather than resurrecting it
+ok 9 - editing a deleted entry fails rather than resurrecting it
+  ---
+  duration_ms: 4.1693
+  type: 'test'
+  ...
+# Subtest: login merges existing unique words from two devices
+ok 10 - login merges existing unique words from two devices
+  ---
+  duration_ms: 18.370997
+  type: 'test'
+  ...
+# Subtest: editing content synchronizes both directions
+ok 11 - editing content synchronizes both directions
+  ---
+  duration_ms: 15.228391
+  type: 'test'
+  ...
+# Subtest: clearing fields is synced and not filled by old data
+ok 12 - clearing fields is synced and not filled by old data
+  ---
+  duration_ms: 11.376035
+  type: 'test'
+  ...
+# Subtest: disjoint offline field edits both survive
+ok 13 - disjoint offline field edits both survive
+  ---
+  duration_ms: 18.988603
+  type: 'test'
+  ...
+# Subtest: same field conflict resolves identically on both devices
+ok 14 - same field conflict resolves identically on both devices
+  ---
+  duration_ms: 18.605165
+  type: 'test'
+  ...
+# Subtest: simultaneous cloud updates use CAS and merge instead of blind overwrite
+ok 15 - simultaneous cloud updates use CAS and merge instead of blind overwrite
+  ---
+  duration_ms: 15.625916
+  type: 'test'
+  ...
+# Subtest: simultaneous initial inserts retry duplicate-key conflict
+ok 16 - simultaneous initial inserts retry duplicate-key conflict
+  ---
+  duration_ms: 12.550327
+  type: 'test'
+  ...
+# Subtest: concurrent local edit during upload is not lost
+ok 17 - concurrent local edit during upload is not lost
+  ---
+  duration_ms: 12.100941
+  type: 'test'
+  ...
+# Subtest: new word created during sync is uploaded in an extra pass
+ok 18 - new word created during sync is uploaded in an extra pass
+  ---
+  duration_ms: 11.004102
+  type: 'test'
+  ...
+# Subtest: network failure preserves edits for successful retry
+ok 19 - network failure preserves edits for successful retry
+  ---
+  duration_ms: 8.541914
+  type: 'test'
+  ...
+# Subtest: rename synchronizes new key and deletes old key on other device
+ok 20 - rename synchronizes new key and deletes old key on other device
+  ---
+  duration_ms: 20.520751
+  type: 'test'
+  ...
+# Subtest: delete wins even if offline old copy was edited later
+ok 21 - delete wins even if offline old copy was edited later
+  ---
+  duration_ms: 5.80623
+  type: 'test'
+  ...
+# Subtest: deliberate re-add after delete syncs correctly
+ok 22 - deliberate re-add after delete syncs correctly
+  ---
+  duration_ms: 8.413352
+  type: 'test'
+  ...
+# Subtest: open edit base: untouched remote field is preserved
+ok 23 - open edit base: untouched remote field is preserved
+  ---
+  duration_ms: 9.226949
+  type: 'test'
+  ...
+# Subtest: open edit base: changed same field triggers explicit conflict
+ok 24 - open edit base: changed same field triggers explicit conflict
+  ---
+  duration_ms: 7.399472
+  type: 'test'
+  ...
+# Subtest: empty device does not wipe existing cloud data
+ok 25 - empty device does not wipe existing cloud data
+  ---
+  duration_ms: 5.530038
+  type: 'test'
+  ...
+# Subtest: no-change sync is idempotent and does not upload
+ok 26 - no-change sync is idempotent and does not upload
+  ---
+  duration_ms: 12.344856
+  type: 'test'
+  ...
+# Subtest: pagination downloads more than 1000 cloud words
+ok 27 - pagination downloads more than 1000 cloud words
+  ---
+  duration_ms: 31349.602234
+  type: 'test'
+  ...
+# Subtest: logout during remote request aborts application to local data
+ok 28 - logout during remote request aborts application to local data
+  ---
+  duration_ms: 14.931158
+  type: 'test'
+  ...
+# Subtest: cloud tombstone payload contains no deleted body
+ok 29 - cloud tombstone payload contains no deleted body
+  ---
+  duration_ms: 6.816402
+  type: 'test'
+  ...
+# Subtest: two overlapping local additions of same term remain one row
+ok 30 - two overlapping local additions of same term remain one row
+  ---
+  duration_ms: 2.231504
+  type: 'test'
+  ...
+# Subtest: stale cloud download merges current local edit instead of overwriting it
+ok 31 - stale cloud download merges current local edit instead of overwriting it
+  ---
+  duration_ms: 2.991411
+  type: 'test'
+  ...
+# Subtest: delete during an in-flight upload is eventually sent as deletion
+ok 32 - delete during an in-flight upload is eventually sent as deletion
+  ---
+  duration_ms: 8.139591
+  type: 'test'
+  ...
+# Subtest: aborted edits emit no successful local-change event
+ok 33 - aborted edits emit no successful local-change event
+  ---
+  duration_ms: 2.304468
+  type: 'test'
+  ...
+# Subtest: new version precaches the edit sync model with the complete app
+ok 34 - new version precaches the edit sync model with the complete app
+  ---
+  duration_ms: 37.072846
+  type: 'test'
+  ...
+# Subtest: activation only removes old app static caches
+ok 35 - activation only removes old app static caches
+  ---
+  duration_ms: 1.40134
+  type: 'test'
+  ...
+# Subtest: program resources are network-first
+ok 36 - program resources are network-first
+  ---
+  duration_ms: 2.277762
+  type: 'test'
+  ...
+# Subtest: offline resource fetch falls back to cache
+ok 37 - offline resource fetch falls back to cache
+  ---
+  duration_ms: 2.279141
+  type: 'test'
+  ...
+# Subtest: offline navigation uses cached index
+ok 38 - offline navigation uses cached index
+  ---
+  duration_ms: 2.19184
+  type: 'test'
+  ...
+# Subtest: temporary server errors fall back to cache
+ok 39 - temporary server errors fall back to cache
+  ---
+  duration_ms: 3.994659
+  type: 'test'
+  ...
+# Subtest: Supabase and non-GET requests are not cached or intercepted
+ok 40 - Supabase and non-GET requests are not cached or intercepted
+  ---
+  duration_ms: 1.151634
+  type: 'test'
+  ...
+# Subtest: cache quota failure does not prevent live app response
+ok 41 - cache quota failure does not prevent live app response
+  ---
+  duration_ms: 1.697563
+  type: 'test'
+  ...
+# Subtest: normalizedTerm folds whitespace and case
+ok 42 - normalizedTerm folds whitespace and case
+  ---
+  duration_ms: 3.10119
+  type: 'test'
+  ...
+# Subtest: legacy contents preserved
+ok 43 - legacy contents preserved
+  ---
+  duration_ms: 1.823867
+  type: 'test'
+  ...
+# Subtest: legacy empty fields do not erase older nonempty data
+ok 44 - legacy empty fields do not erase older nonempty data
+  ---
+  duration_ms: 0.571179
+  type: 'test'
+  ...
+# Subtest: explicit clearing note survives older nonempty record
+ok 45 - explicit clearing note survives older nonempty record
+  ---
+  duration_ms: 0.353187
+  type: 'test'
+  ...
+# Subtest: clearing all optional fields is valid
+ok 46 - clearing all optional fields is valid
+  ---
+  duration_ms: 0.598333
+  type: 'test'
+  ...
+# Subtest: new meaning and new note from independent devices both survive
+ok 47 - new meaning and new note from independent devices both survive
+  ---
+  duration_ms: 0.400458
+  type: 'test'
+  ...
+# Subtest: clearing one field and editing another both survive
+ok 48 - clearing one field and editing another both survive
+  ---
+  duration_ms: 0.250221
+  type: 'test'
+  ...
+# Subtest: later version wins same-field edit
+ok 49 - later version wins same-field edit
+  ---
+  duration_ms: 0.241637
+  type: 'test'
+  ...
+# Subtest: equal timestamp deterministic tie independent of merge direction
+ok 50 - equal timestamp deterministic tie independent of merge direction
+  ---
+  duration_ms: 1.635753
+  type: 'test'
+  ...
+# Subtest: legacy exact-timestamp tie deterministic
+ok 51 - legacy exact-timestamp tie deterministic
+  ---
+  duration_ms: 0.873386
+  type: 'test'
+  ...
+# Subtest: merge is idempotent
+ok 52 - merge is idempotent
+  ---
+  duration_ms: 1.371721
+  type: 'test'
+  ...
+# Subtest: independent field merge is associative
+ok 53 - independent field merge is associative
+  ---
+  duration_ms: 0.559626
+  type: 'test'
+  ...
+# Subtest: editing does not increment occurrenceCount
+ok 54 - editing does not increment occurrenceCount
+  ---
+  duration_ms: 0.122811
+  type: 'test'
+  ...
+# Subtest: merge does not multiply occurrenceCount
+ok 55 - merge does not multiply occurrenceCount
+  ---
+  duration_ms: 0.121399
+  type: 'test'
+  ...
+# Subtest: createdAt preserved by ordinary edit
+ok 56 - createdAt preserved by ordinary edit
+  ---
+  duration_ms: 0.087829
+  type: 'test'
+  ...
+# Subtest: term casing edit keeps normalized key
+ok 57 - term casing edit keeps normalized key
+  ---
+  duration_ms: 0.09592
+  type: 'test'
+  ...
+# Subtest: empty term rejected
+ok 58 - empty term rejected
+  ---
+  duration_ms: 0.557554
+  type: 'test'
+  ...
+# Subtest: different keys cannot silently merge
+ok 59 - different keys cannot silently merge
+  ---
+  duration_ms: 0.227724
+  type: 'test'
+  ...
+# Subtest: deleted word beats stale edit made later on offline device
+ok 60 - deleted word beats stale edit made later on offline device
+  ---
+  duration_ms: 0.375406
+  type: 'test'
+  ...
+# Subtest: delete wins simultaneous create
+ok 61 - delete wins simultaneous create
+  ---
+  duration_ms: 0.166658
+  type: 'test'
+  ...
+# Subtest: newer deletion wins
+ok 62 - newer deletion wins
+  ---
+  duration_ms: 0.113941
+  type: 'test'
+  ...
+# Subtest: explicit re-add after known deletion survives
+ok 63 - explicit re-add after known deletion survives
+  ---
+  duration_ms: 0.166921
+  type: 'test'
+  ...
+# Subtest: subsequent delete also deletes a re-added word
+ok 64 - subsequent delete also deletes a re-added word
+  ---
+  duration_ms: 0.111381
+  type: 'test'
+  ...
+# Subtest: old content is not filled into intentionally re-added blank word
+ok 65 - old content is not filled into intentionally re-added blank word
+  ---
+  duration_ms: 0.189397
+  type: 'test'
+  ...
+# Subtest: syncToken is transport-only and cannot leak into comparison
+ok 66 - syncToken is transport-only and cannot leak into comparison
+  ---
+  duration_ms: 0.151875
+  type: 'test'
+  ...
+# Subtest: local IDs never uploaded as identity
+ok 67 - local IDs never uploaded as identity
+  ---
+  duration_ms: 0.572398
+  type: 'test'
+  ...
+# Subtest: next local clock strictly later than observed future timestamp
+ok 68 - next local clock strictly later than observed future timestamp
+  ---
+  duration_ms: 0.364889
+  type: 'test'
+  ...
+# Subtest: null state merge preserves real state
+ok 69 - null state merge preserves real state
+  ---
+  duration_ms: 0.239918
+  type: 'test'
+  ...
+# Subtest: tombstone carries no word content
+ok 70 - tombstone carries no word content
+  ---
+  duration_ms: 0.086531
+  type: 'test'
+  ...
+# Subtest: all editable fields have independent versions
+ok 71 - all editable fields have independent versions
+  ---
+  duration_ms: 0.08397
+  type: 'test'
+  ...
+1..71
+# tests 71
+# suites 0
+# pass 71
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 31844.157318

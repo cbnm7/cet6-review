@@ -4,6 +4,69 @@ const count = document.getElementById("wordCount");
 const saveButton = document.getElementById("saveButton");
 const formMessage = document.getElementById("formMessage");
 const accountCard = document.getElementById("accountCard");
+const formTitle = document.getElementById("saveTitle");
+const formHint = document.getElementById("formHint");
+const cancelEditButton = document.getElementById("cancelEditButton");
+const EDIT_FIELDS = ["term", "meaning", "source", "sentence", "note"];
+let editingOriginal = null;
+let previousAddDraft = null;
+let formBusy = false;
+let refreshSequence = 0;
+let editRequestSequence = 0;
+
+function formValues() {
+  return Object.fromEntries(EDIT_FIELDS.map(field => [field, document.getElementById(field).value]));
+}
+function fillForm(values = {}) {
+  values ||= {};
+  EDIT_FIELDS.forEach(field => { document.getElementById(field).value = values[field] || ""; });
+}
+function hasUnsavedEdits() {
+  return editingOriginal && EDIT_FIELDS.some(field => formValues()[field] !== String(editingOriginal[field] || ""));
+}
+function endEditing({ restoreDraft = true } = {}) {
+  editRequestSequence++;
+  editingOriginal = null;
+  formTitle.textContent = "保存生词";
+  formHint.textContent = "再次遇见同一词条可重复保存；仅修改内容请点击词条的“编辑”";
+  saveButton.textContent = "保存";
+  cancelEditButton.hidden = true;
+  form.classList.remove("is-editing");
+  fillForm(restoreDraft ? previousAddDraft : {});
+  previousAddDraft = null;
+}
+async function startEditing(item) {
+  if (formBusy) return;
+  if (hasUnsavedEdits() && !confirm("当前编辑尚未保存，确定放弃并编辑另一条吗？")) return;
+  const requestSequence = ++editRequestSequence;
+  const latest = await getReadingWordById(item.id);
+  if (requestSequence !== editRequestSequence || formBusy) return;
+  if (!latest) { formMessage.textContent = "这条生词已被删除，请刷新列表后重试。"; await refreshList(); return; }
+  if (!editingOriginal) previousAddDraft = formValues();
+  editingOriginal = clonePlain(latest);
+  fillForm(latest);
+  formTitle.textContent = "编辑生词";
+  formHint.textContent = "可修改全部内容或清空选填项；编辑不增加遇见次数";
+  saveButton.textContent = "保存修改";
+  cancelEditButton.hidden = false;
+  form.classList.add("is-editing");
+  formMessage.textContent = `正在编辑：${latest.term}`;
+  document.querySelector(".form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("term").focus({ preventScroll: true });
+}
+function cancelEditing() {
+  if (formBusy) return;
+  if (hasUnsavedEdits() && !confirm("放弃当前尚未保存的修改吗？")) return;
+  endEditing();
+  formMessage.textContent = "已取消编辑，原词条未修改。";
+}
+cancelEditButton.addEventListener("click", cancelEditing);
+form.addEventListener("keydown", event => {
+  if (event.key === "Escape" && editingOriginal) { event.preventDefault(); cancelEditing(); }
+});
+window.addEventListener("beforeunload", event => {
+  if (formBusy || hasUnsavedEdits()) { event.preventDefault(); event.returnValue = ""; }
+});
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -26,7 +89,7 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"
   }).format(date);
 }
 
@@ -49,13 +112,16 @@ function renderWord(item) {
   const updated = formatDate(item.updatedAt || item.createdAt);
 
   return `
-    <article class="word-item">
+    <article class="word-item" data-word-id="${Number(item.id)}">
       <div class="word-item-head">
         <div class="word-title-wrap">
           <h3>${escapeHtml(item.term)}</h3>
           ${item.meaning ? `<p class="word-meaning">${escapeHtml(item.meaning)}</p>` : ""}
         </div>
-        <button class="delete-button" type="button" data-delete-id="${Number(item.id)}">删除</button>
+        <div class="word-actions">
+          <button class="edit-button" type="button" data-edit-id="${Number(item.id)}" aria-label="编辑 ${escapeHtml(item.term)}">编辑</button>
+          <button class="delete-button" type="button" data-delete-id="${Number(item.id)}" aria-label="删除 ${escapeHtml(item.term)}">删除</button>
+        </div>
       </div>
       ${item.sentence ? `<p class="word-sentence">${escapeHtml(item.sentence)}</p>` : ""}
       ${item.note ? `<p class="word-note">${escapeHtml(item.note)}</p>` : ""}
@@ -68,7 +134,9 @@ function renderWord(item) {
 }
 
 async function refreshList() {
+  const sequence = ++refreshSequence;
   const items = await getAllReadingWords();
+  if (sequence !== refreshSequence) return;
   count.textContent = String(items.length);
 
   if (!items.length) {
@@ -77,13 +145,24 @@ async function refreshList() {
   }
 
   list.innerHTML = items.map(renderWord).join("");
+  list.querySelectorAll("[data-edit-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      const item = items.find(row => Number(row.id) === Number(button.dataset.editId));
+      if (item) startEditing(item).catch(error => { formMessage.textContent = error.message || "打开编辑失败"; });
+    });
+  });
   list.querySelectorAll("[data-delete-id]").forEach(button => {
     button.addEventListener("click", async () => {
+      if (formBusy) return;
       const item = items.find(row => Number(row.id) === Number(button.dataset.deleteId));
       if (!item || !confirm(`确定删除“${item.term}”吗？\n\n登录状态下，这次删除会同步到云端，并让其他设备下次同步时一起删除。`)) return;
       button.disabled = true;
       try {
         await deleteReadingWord(item.id);
+        if (editingOriginal?.id === item.id) {
+          endEditing();
+          formMessage.textContent = "已删除词条并退出编辑。";
+        }
         await refreshList();
       } catch (error) {
         console.error(error);
@@ -116,7 +195,7 @@ function renderAccount() {
   if (!status.signedIn) {
     accountCard.innerHTML = `
       <div class="account-head">
-        <div><h2>账号同步</h2><p>登录后自动合并不同设备的生词；删除也会跨设备同步。</p></div>
+        <div><h2>账号同步</h2><p>登录后合并生词；新增、编辑和删除均可跨设备同步。</p></div>
         <span class="cloud-pill">${status.online ? "未登录" : "离线"}</span>
       </div>
       <form id="authForm" class="auth-form">
@@ -139,7 +218,7 @@ function renderAccount() {
     </div>
     <div class="sync-summary">
       ${status.lastSyncAt ? `上次同步：${escapeHtml(formatDateTime(status.lastSyncAt))}` : "等待首次同步"}
-      <br>不同设备登录同一账号后会合并词条；云端删除墓碑会让旧设备同步删除，不会把旧词重新复活。
+      <br>新增、编辑、清空字段和删除都会双向同步。另一台设备登录、回到页面或点击“立即同步”时更新；前台也会每 60 秒自动检查。
     </div>
     <div class="auth-actions">
       <button class="primary-button compact" id="syncNowButton" type="button" ${status.syncing || !status.online ? "disabled" : ""}>立即同步</button>
@@ -219,31 +298,56 @@ function bindSignedInEvents() {
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  saveButton.disabled = true;
-  formMessage.textContent = "正在保存…";
-
+  if (formBusy) return;
+  formBusy = true;
+  const wasEditing = Boolean(editingOriginal);
+  const values = formValues();
+  // 等待事务提交期间锁定表单，不让新输入被保存完成后的清空动作吞掉。
+  form.querySelectorAll("input, textarea, button").forEach(el => { el.disabled = true; });
+  formMessage.textContent = wasEditing ? "正在保存修改…" : "正在保存…";
   try {
-    const saved = await saveReadingWord({
-      term: document.getElementById("term").value,
-      meaning: document.getElementById("meaning").value,
-      source: document.getElementById("source").value,
-      sentence: document.getElementById("sentence").value,
-      note: document.getElementById("note").value
-    });
-    form.reset();
-    document.getElementById("term").focus();
-    formMessage.textContent = `已保存：${saved.term}`;
+    let saved;
+    if (wasEditing) {
+      const patch = {};
+      EDIT_FIELDS.forEach(field => {
+        if (values[field] !== String(editingOriginal[field] ?? "")) patch[field] = values[field];
+      });
+      saved = await updateReadingWord(editingOriginal.id, patch, { base: editingOriginal });
+      endEditing();
+    } else {
+      saved = await saveReadingWord(values);
+      form.reset();
+    }
+    const status = window.ReadingWordsCloud?.getStatus();
+    const suffix = status?.signedIn
+      ? (navigator.onLine ? "；会自动同步到云端" : "；联网后自动同步")
+      : "；登录后可同步到其他设备";
+    formMessage.textContent = `${wasEditing ? "已保存修改" : "已保存"}：${saved.term}（本机）${suffix}`;
     await refreshList();
   } catch (error) {
     console.error(error);
-    formMessage.textContent = error?.message || "保存失败";
+    formMessage.textContent = error?.message || "保存失败，输入内容已保留";
   } finally {
-    saveButton.disabled = false;
+    formBusy = false;
+    form.querySelectorAll("input, textarea, button").forEach(el => { el.disabled = false; });
   }
 });
 
 window.addEventListener("reading-words-cloud-status", renderAccount);
-window.addEventListener("reading-words-cloud-data-updated", () => refreshList().catch(console.error));
+async function handleRemoteRefresh() {
+  await refreshList(); // 只刷新列表，不回填或重置正在输入的表单。
+  if (editingOriginal) {
+    const latest = await getReadingWordById(editingOriginal.id);
+    if (!latest || EDIT_FIELDS.some(f => String(latest[f] || "") !== String(editingOriginal[f] || ""))) {
+      formMessage.textContent = "此词条收到其他页面/设备的修改，当前草稿已保留；保存时会检查冲突。";
+    }
+  }
+}
+window.addEventListener("reading-words-cloud-data-updated", () => handleRemoteRefresh().catch(console.error));
+window.addEventListener("reading-words-peer-change", () => handleRemoteRefresh().catch(console.error));
+window.addEventListener("reading-words-db-blocked", () => {
+  formMessage.textContent = "请先关闭旧版页面，再重新打开本页面；不要清除网站数据。";
+});
 
 async function init() {
   try {
@@ -257,11 +361,10 @@ async function init() {
   renderAccount();
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./service-worker.js?v=3.1.0").catch(error => {
-        console.warn("Service Worker 注册失败：", error);
-      });
-    }, { once: true });
+    // init 包含异步数据库读取，load 可能已触发；不再等待已经错过的事件。
+    navigator.serviceWorker.register("./service-worker.js?v=3.2.0", { updateViaCache: "none" })
+      .then(registration => registration.update())
+      .catch(error => console.warn("Service Worker 注册/更新失败：", error));
   }
 }
 

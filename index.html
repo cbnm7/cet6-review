@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111827">
-  <meta name="description" content="保存阅读中遇到的英语生词，并在多个设备之间登录同步。">
+  <meta name="description" content="保存和编辑阅读生词，支持云端与多设备双向同步。">
   <title>阅读生词</title>
-  <link rel="manifest" href="./manifest.json?v=3.1.0">
+  <link rel="manifest" href="./manifest.json?v=3.2.0">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./style.css?v=3.1.0">
+  <link rel="stylesheet" href="./style.css?v=3.2.0">
 </head>
 <body>
   <main class="app-shell">
@@ -31,7 +31,7 @@
     <section class="card form-card" aria-labelledby="saveTitle">
       <div class="section-heading">
         <h2 id="saveTitle">保存生词</h2>
-        <span>同一词条再次保存会更新内容并累计遇见次数</span>
+        <span id="formHint">再次遇见同一词条可重复保存；仅修改内容请点击词条的“编辑”</span>
       </div>
 
       <form id="wordForm" class="word-form" autocomplete="off">
@@ -55,7 +55,10 @@
           <span>备注</span>
           <textarea id="note" name="note" rows="2" placeholder="可选：搭配、易混点等"></textarea>
         </label>
-        <button id="saveButton" class="primary-button" type="submit">保存</button>
+        <div class="form-actions">
+          <button id="saveButton" class="primary-button" type="submit">保存</button>
+          <button id="cancelEditButton" class="secondary-button" type="button" hidden>取消编辑</button>
+        </div>
         <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
       </form>
     </section>
@@ -64,11 +67,13 @@
       <div class="section-heading list-heading"><h2 id="savedTitle">已保存生词</h2></div>
       <div id="wordList" class="word-list"></div>
     </section>
+    <footer class="app-version">Reading Words · v3.2.0 编辑同步版</footer>
   </main>
 
-  <script src="./db.js?v=3.1.0"></script>
-  <script src="./supabase-config.js?v=3.1.0"></script>
-  <script src="./cloud-sync.js?v=3.1.0"></script>
-  <script src="./app.js?v=3.1.0"></script>
+  <script src="./sync-model.js?v=3.2.0"></script>
+  <script src="./db.js?v=3.2.0"></script>
+  <script src="./supabase-config.js?v=3.2.0"></script>
+  <script src="./cloud-sync.js?v=3.2.0"></script>
+  <script src="./app.js?v=3.2.0"></script>
 </body>
 </html>

@@ -1,0 +1,88 @@
+{
+  "environment": "Chromium about:blank; production scripts; mocked IndexedDB/Supabase/network/service worker",
+  "checks": [
+    {
+      "name": "首页与登录表单初始化",
+      "passed": true
+    },
+    {
+      "name": "保存后词卡同时有编辑和删除按钮",
+      "passed": true
+    },
+    {
+      "name": "编辑自动回填原内容",
+      "passed": true
+    },
+    {
+      "name": "编辑不增加词条或遇见次数且保留ID",
+      "passed": true
+    },
+    {
+      "name": "改拼写移除旧词头，清空备注有效",
+      "passed": true
+    },
+    {
+      "name": "取消编辑不修改记录并恢复原新增草稿",
+      "passed": true
+    },
+    {
+      "name": "后台同步只刷新列表，不覆盖正在输入的草稿",
+      "passed": true
+    },
+    {
+      "name": "保存草稿只写触碰字段，保留手机新来源",
+      "passed": true
+    },
+    {
+      "name": "发现同字段冲突时保留草稿并提示",
+      "passed": true
+    },
+    {
+      "name": "改名撞词会提示，不覆盖另一词条",
+      "passed": true
+    },
+    {
+      "name": "编辑和显示入口转义词条HTML",
+      "passed": true
+    },
+    {
+      "name": "登录后保留列表并上传至模拟云端",
+      "passed": true
+    },
+    {
+      "name": "保存修改后自动同步（模拟云端）",
+      "passed": true
+    },
+    {
+      "name": "编辑中被删除不会被保存按钮复活",
+      "passed": true
+    },
+    {
+      "name": "360px 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "390px 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "560px 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "1100px 页面无横向溢出",
+      "passed": true
+    },
+    {
+      "name": "App 调用了新版 SW 注册（注册接口为替身）",
+      "passed": true
+    },
+    {
+      "name": "没有未捕获页面脚本异常",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "passed": 20,
+  "total": 20
+}

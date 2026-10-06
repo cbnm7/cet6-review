@@ -330,3 +330,24 @@ h1 {
   .account-head { gap: 10px; }
   .auth-actions { flex-wrap: wrap; }
 }
+
+/* v3.2.0：编辑沿用原表单，移动端按钮留足触摸区域。 */
+[hidden] { display: none !important; }
+.form-actions { display: flex; gap: 10px; }
+.form-actions .primary-button { flex: 1; }
+.word-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.edit-button, .word-actions .delete-button {
+  min-height: 40px; min-width: 44px; padding: 8px 10px; border-radius: 9px;
+  font-size: 12px; cursor: pointer;
+}
+.edit-button { border: 1px solid var(--border); background: var(--soft); color: var(--text); }
+.edit-button:hover { border-color: #aeb4bc; background: #eee; }
+.is-editing { padding-top: 2px; }
+.form-message { line-height: 1.65; }
+.app-version { margin: 26px 0 0; text-align: center; font-size: 11px; color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.word-meaning, .word-meta { overflow-wrap: anywhere; }
+@media (max-width: 360px) {
+  .word-item-head { gap: 8px; }
+  .word-actions { flex-direction: column; gap: 2px; }
+}

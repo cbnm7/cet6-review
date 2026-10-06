@@ -1,0 +1,13 @@
+{
+  "supabase-config.js": true,
+  "supabase-schema.sql": true,
+  "icons/icon-192.png": true,
+  "icons/icon-512.png": true,
+  "icons/icon-maskable-512.png": true,
+  "icons/apple-touch-icon.png": true,
+  "database_name_and_version_unchanged": true,
+  "no_database_clear_or_delete": true,
+  "all_script_paths_exist": true,
+  "new_model_precached": true,
+  "manifest_valid": true
+}
