@@ -257,3 +257,76 @@ h1 {
   .section-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .section-heading > span { text-align: left; }
 }
+
+/* v3.1.0 账号双向同步 */
+.account-card {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+}
+.account-loading { color: var(--muted); font-size: 13px; }
+.account-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.account-head h2 { margin: 0; font-size: 18px; }
+.account-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.account-email { overflow-wrap: anywhere; }
+.cloud-pill {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--soft);
+  font-size: 11px;
+}
+.cloud-pill.is-syncing { color: var(--text); }
+.auth-form { display: grid; gap: 10px; margin-top: 15px; }
+.auth-form input {
+  min-height: 44px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fafafa;
+  outline: none;
+}
+.auth-form input:focus { border-color: #aeb4bc; background: #fff; }
+.auth-actions { display: flex; gap: 9px; margin-top: 12px; }
+.primary-button.compact { min-height: 42px; padding: 0 18px; }
+.secondary-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.secondary-button:disabled { opacity: .55; cursor: default; }
+.cloud-message {
+  min-height: 17px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.cloud-message.is-error { color: var(--danger); }
+.sync-summary {
+  margin-top: 13px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: var(--soft);
+  color: #656b72;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+@media (max-width: 560px) {
+  .account-card { padding: 16px; }
+  .account-head { gap: 10px; }
+  .auth-actions { flex-wrap: wrap; }
+}

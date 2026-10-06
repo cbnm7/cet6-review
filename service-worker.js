@@ -1,21 +1,22 @@
-// 阅读生词 v3.0.0
-// 仅缓存当前极简 App 静态文件；绝不操作 IndexedDB。
-const VERSION = "3.0.0";
+// 阅读生词 v3.1.0
+// 仅缓存当前 App 静态文件；绝不清理 IndexedDB 或登录数据。
+const VERSION = "3.1.0";
 const CACHE = `reading-words-${VERSION}`;
 const ROOT = new URL("./", self.location.href);
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=3.0.0",
-  "./db.js?v=3.0.0",
-  "./app.js?v=3.0.0",
-  "./manifest.json?v=3.0.0",
+  "./style.css?v=3.1.0",
+  "./db.js?v=3.1.0",
+  "./supabase-config.js?v=3.1.0",
+  "./cloud-sync.js?v=3.1.0",
+  "./app.js?v=3.1.0",
+  "./manifest.json?v=3.1.0",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png"
 ];
-
 const absolute = path => new URL(path, ROOT).href;
 
 self.addEventListener("install", event => {
